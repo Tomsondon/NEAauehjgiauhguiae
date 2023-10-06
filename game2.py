@@ -10,6 +10,19 @@ l = config[41:45]
 r = config[53:57]
 
 
+def approachVector(vector):
+    if vector.x ** 2 > vector.y ** 2:
+        if vector.x < 0:
+            return 3
+        else:
+            return 4
+    else:
+        if vector.y < 0:
+            return 1
+        else:
+            return 2
+
+
 def getCoord(x, y):
     coordX = (24 * x) + 12
     coordY = (24 * y) + 12
@@ -24,9 +37,9 @@ def getGridRef(x, y):
     return refX, refY
 
 
-def drawValue(identifier, variable, pos):
+def drawValue(text, variable, pos):
     my_font = pygame.font.SysFont('Jokerman', 30)
-    valText = f"{identifier}: {variable}"
+    valText = f"{text}: {variable}"
     val_surface = my_font.render(valText, False, "White")
     screen.blit(val_surface, pos)
 
@@ -38,13 +51,26 @@ def createNodeMap(maze):
 class Game:
     def __init__(self, lives, Level):
         if Level == 1:
-            self._board = board.board1
+            self._board = board.boards
         self._time = pygame.time.get_ticks()
         self.__dotsLeft = 0
         self.__score = 0
         self.__lives = lives
         self.__wallPositions = []
         self.__pelletPositions = []
+        self.__ogPelletPositions = []
+        self.__pelletPositions = []
+        for j in range(len(self._board)):
+            for i in range(len(self._board[j])):
+                pos = getCoord(i, j)
+                if self._board[j][i] == 1:
+                    self.__ogPelletPositions.append(pygame.Rect(pos[0] - 3, pos[1] - 3, 6, 6))
+                    self.__dotsLeft += 1
+                elif self._board[j][i] == 2:
+                    self.__ogPelletPositions.append(pygame.Rect(pos[0] - 6, pos[1] - 6, 12, 12))
+                    self.__dotsLeft += 1
+                elif self._board[j][i] > 2:
+                    self.__wallPositions.append(pygame.Rect(pos[0] - 12, pos[1] - 12, 24, 24))
         for j in range(len(self._board)):
             for i in range(len(self._board[j])):
                 pos = getCoord(i, j)
@@ -105,9 +131,20 @@ class Game:
     def getTime(self):
         return self._time
 
+    def ihavenoideawhytheattributeissticky(self):
+        self.addLives(-1)
+        print("before")
+        print(self.__pelletPositions)
+        print(self.__ogPelletPositions)
+        self.__pelletPositions = self.__ogPelletPositions
+        print("after")
+        print(self.__pelletPositions)
+        print(self.__ogPelletPositions)
+
 
 class Entity:
     def __init__(self, img, position):
+        self._imgJPG = img
         self._img = pygame.transform.scale(pygame.image.load(img), (24, 24))
         self._position = pygame.Vector2(position)
         self._direction = 0
@@ -128,13 +165,20 @@ class Entity:
     def setDirection(self, direction):
         self._direction = direction
 
+    def getDirection(self):
+        return self._direction
+
+    def setPosition(self, pos):
+        self._position = pos
+    def getSpeed(self):
+        return self._speed
     def Render(self):
-        self.updatePos()
+        self.Update()
         self._boundBox = pygame.Rect(self._position.x, self._position.y, 24, 24)
         screen.blit(self._img, self._position)
         pygame.draw.rect(screen, "red", self._boundBox, 1)
 
-    def updatePos(self):
+    def Update(self):
         if self._direction != 0:
             if self._direction == 1:
                 self._position.y -= self._speed * 300 * dt
@@ -145,10 +189,16 @@ class Entity:
             if self._direction == 4:
                 self._position.x += self._speed * 300 * dt
 
+            if self._position.x < 0:
+                self._position.x = 720
+            if self._position.x > 720:
+                self._position.x = 0
+
 
 class Player(Entity):
     def __init__(self):
-        Entity.__init__(self, "pictuer2 053.jpg", (168, 200))
+        self.__startPoint = getCoord(14, 23)
+        Entity.__init__(self, "pictuer2 053.jpg", (self.__startPoint[0] - 12, self.__startPoint[1] + 12))
         self.__nextDirection = 0
 
     def addDirection(self, newDirection):
@@ -158,16 +208,136 @@ class Player(Entity):
             self._direction = newDirection
 
 
+    def Restart(self):
+        self._position = pygame.Vector2(self.__startPoint[0] - 12, self.__startPoint[1] + 12)
+        self._direction = 0
+        self.__nextDirection = 0
+        pygame.time.delay(1000)
+
+
 class Ghost(Entity):
     def __init__(self, ghostType):  # 0 is blinky, 1 is inky, 2 is pinky, 3 is clyde
+        self._manUp = 9999999999  # timer for scared phase, determines at what tick the ghost should stop being scared
         if ghostType == 0:
-            Entity.__init__(self, "blinky.jpg", (300, 1))
+            Entity.__init__(self, "blinky.jpg", (336, 384))
         elif ghostType == 1:
-            Entity.__init__(self, "inky.jpg", (600, 1))
+            Entity.__init__(self, "inky.jpg", (336, 360))
         elif ghostType == 2:
-            Entity.__init__(self, "pinky.jpg", (1, 300))
+            Entity.__init__(self, "pinky.jpg", (312, 384))
         elif ghostType == 3:
-            Entity.__init__(self, "clyde.jpg", (300, 600))
+            Entity.__init__(self, "clyde.jpg", (312, 360))
+        self._isScared = False
+        self._isDead = False
+        self._chaseMode = 1  # 0 is scatter state, 1 is chase state
+
+    def scareGhost(self):
+        self._manUp = pygame.time.get_ticks() + 5000
+        self._isScared = True
+        self._img = pygame.transform.scale(pygame.image.load("scared.jpg"), (24, 24))
+        self._speed = 0.5
+        if self._direction != 0:
+            if self._direction // 2 == 0:
+                self._direction -= 1
+            elif self._direction // 2 == 1:
+                self._direction += 1
+        self._direction = 4
+
+    def runAway(self, targetVector):
+        displacementVector = targetVector - self.getPosition()
+        if displacementVector.x ** 2 < displacementVector.y ** 2:
+            if displacementVector.x < 0:
+                self._direction = 4
+            else:
+                self._direction = 3
+        else:
+            if displacementVector.y < 0:
+                self._direction = 2
+            else:
+                self._direction = 1
+
+    def killGhost(self):
+        self._isDead = True
+        self._isScared = False
+
+    def Update(self):
+        super().Update()
+        if pygame.time.get_ticks() >= self._manUp:
+            self._isScared = False
+            self._img = pygame.transform.scale(pygame.image.load(self._imgJPG), (24, 24))
+            self._speed = 1
+            self._manUp = 9999999999
+
+    def isScared(self):
+        return self._isScared
+
+
+class Blinky(Ghost):
+    def __init__(self):
+        Ghost.__init__(self, 0)
+
+    def chasePlayer(self):
+        displacementVector = hero.getPosition() - self.getPosition()
+        if displacementVector.x ** 2 > displacementVector.y ** 2:
+            if displacementVector.x < 0:
+                self._direction = 3
+            else:
+                self._direction = 4
+        else:
+            if displacementVector.y < 0:
+                self._direction = 1
+            else:
+                self._direction = 2
+
+
+class Inky(Ghost):
+    def __init__(self):
+        Ghost.__init__(self, 1)
+
+    def chasePlayer(self):
+        intermediateVector = hero.getPosition()
+        if hero.getDirection() == 1:
+            intermediateVector.y -= 2 * 24
+        elif hero.getDirection() == 2:
+            intermediateVector.y += 2 * 24
+        elif hero.getDirection() == 3:
+            intermediateVector.x -= 2 * 24
+        elif hero.getDirection() == 4:
+            intermediateVector.x += 2 * 24
+
+        displacementVector = pygame.Vector2(0, 0)
+        posVector = pygame.Vector2(0, 0)
+        invDisplacementVector = pygame.Vector2(blinky.getPosition() - intermediateVector)
+        displacementVector.x = -1 * invDisplacementVector.x
+        displacementVector.y = -1 * invDisplacementVector.y
+        posVector = displacementVector + hero.getPosition()
+        self._direction = approachVector(posVector)
+
+
+class Pinky(Ghost):
+    def __init__(self):
+        Ghost.__init__(self, 2)
+
+    def chasePlayer(self):
+        targetVector = hero.getPosition()
+        if hero.getDirection() == 1:
+            targetVector.y -= 4 * 24
+        elif hero.getDirection() == 2:
+            targetVector.y += 4 * 24
+        elif hero.getDirection() == 3:
+            targetVector.x -= 4 * 24
+        elif hero.getDirection() == 4:
+            targetVector.x += 4 * 24
+        displacementVector = targetVector - self.getPosition()
+        if displacementVector.x ** 2 > displacementVector.y ** 2:
+            if displacementVector.x < 0:
+                self._direction = 3
+            else:
+                self._direction = 4
+        else:
+            if displacementVector.y < 0:
+                self._direction = 1
+            else:
+                self._direction = 2
 
 
 ##################################MAIN PROGRAM####################################################
@@ -187,10 +357,17 @@ dt = 0
 level = 1
 game = Game(3, level)
 hero = Player()
-blinky = Ghost(0)
-inky = Ghost(1)
-pinky = Ghost(2)
+blinky = Blinky()
+inky = Inky()
+pinky = Pinky()
 clyde = Ghost(3)
+
+
+def ghostCollision():
+    if heroBox.colliderect(blinky.getBoundBox()) or heroBox.colliderect(inky.getBoundBox()) or heroBox.colliderect(
+            pinky.getBoundBox()) or heroBox.colliderect(clyde.getBoundBox()):
+        return True
+
 
 while running:
     # poll for events
@@ -200,6 +377,8 @@ while running:
             running = False
 
     screen.fill("black")
+
+    currentPos = hero.getPosition()
 
     keys = pygame.key.get_pressed()
     if keys[pygame.K_w]:
@@ -213,28 +392,54 @@ while running:
     if keys[pygame.K_ESCAPE]:
         running = False
     if game.getDotsLeft() == 0:
+        print("Level complete!")
         running = False
 
-    if keys[pygame.K_t]:
-        hero.addSpeed(-0.1)
-    if keys[pygame.K_y]:
-        hero.addSpeed(0.1)
+    drawValue("Speed", hero.getSpeed(), (400,900))
+    #if keys[pygame.K_t]:
+        #hero.addSpeed(-0.01)
+  #  if keys[pygame.K_y]:
+ #       hero.addSpeed(0.01)
+  #  if keys[pygame.K_p]:
+ #       print(hero.getPosition())
 
     game.Render()
     hero.Render()
+    if not (blinky.isScared()):
+        blinky.chasePlayer()
+        inky.chasePlayer()
+        pinky.chasePlayer()
+    else:
+        blinky.runAway(currentPos)
     blinky.Render()
     inky.Render()
     pinky.Render()
     clyde.Render()
 
     heroBox = hero.getBoundBox()
-    if game.collidesWithWall(heroBox):
-        pass
+    # if game.collidesWithWall(heroBox):
+    # hero.setPosition(currentPos)
+    # hero.setDirection(0)
     pelletCheck = game.collidesWithPellet(heroBox)
     if pelletCheck == 1:
         game.addScore(10)
     elif pelletCheck == 2:
         game.addScore(50)
+        blinky.scareGhost()
+        inky.scareGhost()
+        pinky.scareGhost()
+        clyde.scareGhost()
+
+    if ghostCollision():
+        game.addLives(-1)
+        hero.Restart()
+        blinky = Blinky()
+        inky = Inky()
+        pinky = Pinky()
+
+    if game.getLives() == 0:
+        print("Ran out of lives!")
+        running = False
 
     # flip() the display to put your work on screen
     pygame.display.flip()
