@@ -207,6 +207,12 @@ class Player(Entity):
         else:
             self._direction = newDirection
 
+    def Update(self):
+        super().Update()
+        self._speed = 1
+        print("balls")
+
+
 
     def Restart(self):
         self._position = pygame.Vector2(self.__startPoint[0] - 12, self.__startPoint[1] + 12)
@@ -275,15 +281,15 @@ class Blinky(Ghost):
     def __init__(self):
         Ghost.__init__(self, 0)
 
-    def chasePlayer(self):
-        displacementVector = hero.getPosition() - self.getPosition()
-        if displacementVector.x ** 2 > displacementVector.y ** 2:
-            if displacementVector.x < 0:
+    def chasePlayer(self, playerPos):
+        displacementVector = list(playerPos - self.getPosition())
+        if displacementVector[0] ** 2 > displacementVector[1] ** 2:
+            if displacementVector[0] < 0:
                 self._direction = 3
             else:
                 self._direction = 4
         else:
-            if displacementVector.y < 0:
+            if displacementVector[1] < 0:
                 self._direction = 1
             else:
                 self._direction = 2
@@ -293,48 +299,49 @@ class Inky(Ghost):
     def __init__(self):
         Ghost.__init__(self, 1)
 
-    def chasePlayer(self):
-        intermediateVector = hero.getPosition()
-        if hero.getDirection() == 1:
-            intermediateVector.y -= 2 * 24
-        elif hero.getDirection() == 2:
-            intermediateVector.y += 2 * 24
-        elif hero.getDirection() == 3:
-            intermediateVector.x -= 2 * 24
-        elif hero.getDirection() == 4:
-            intermediateVector.x += 2 * 24
+    def chasePlayer(self, playerPos, playerDir, blinkyPos):
+        posArr = list(playerPos)
+        if playerDir == 1:
+            posArr[1] -= 2 * 24
+        elif playerDir == 2:
+            posArr[1] += 2 * 24
+        elif playerDir == 3:
+            posArr[0] -= 2 * 24
+        elif playerDir == 4:
+            posArr[0] += 2 * 24
 
-        displacementVector = pygame.Vector2(0, 0)
-        posVector = pygame.Vector2(0, 0)
-        invDisplacementVector = pygame.Vector2(blinky.getPosition() - intermediateVector)
-        displacementVector.x = -1 * invDisplacementVector.x
-        displacementVector.y = -1 * invDisplacementVector.y
-        posVector = displacementVector + hero.getPosition()
-        self._direction = approachVector(posVector)
+        displacementVector = [0,0]
+        invDisplacementVector = list(blinkyPos - posArr)
+        displacementVector[0] = -1 * invDisplacementVector[0]
+        displacementVector[1] = -1 * invDisplacementVector[1]
+        targetVector = [0,0]
+        targetVector[0] = displacementVector[0] + posArr[0]
+        targetVector[1] = displacementVector[1] + posArr[1]
+        self._direction = approachVector(pygame.Vector2(targetVector))
 
 
 class Pinky(Ghost):
     def __init__(self):
         Ghost.__init__(self, 2)
 
-    def chasePlayer(self):
-        targetVector = hero.getPosition()
-        if hero.getDirection() == 1:
-            targetVector.y -= 4 * 24
-        elif hero.getDirection() == 2:
-            targetVector.y += 4 * 24
-        elif hero.getDirection() == 3:
-            targetVector.x -= 4 * 24
-        elif hero.getDirection() == 4:
-            targetVector.x += 4 * 24
-        displacementVector = targetVector - self.getPosition()
-        if displacementVector.x ** 2 > displacementVector.y ** 2:
-            if displacementVector.x < 0:
+    def chasePlayer(self, playerPos, playerDir):
+        targetVector = list(playerPos)
+        if playerDir == 1:
+            targetVector[1] -= 4 * 24
+        elif playerDir == 2:
+            targetVector[1] += 4 * 24
+        elif playerDir == 3:
+            targetVector[0] -= 4 * 24
+        elif playerDir == 4:
+            targetVector[0] += 4 * 24
+        displacementVector = list(targetVector - self.getPosition())
+        if displacementVector[0] ** 2 > displacementVector[1] ** 2:
+            if displacementVector[0] < 0:
                 self._direction = 3
             else:
                 self._direction = 4
         else:
-            if displacementVector.y < 0:
+            if displacementVector[1] < 0:
                 self._direction = 1
             else:
                 self._direction = 2
@@ -405,12 +412,16 @@ while running:
 
     game.Render()
     hero.Render()
-    if not (blinky.isScared()):
-        blinky.chasePlayer()
-        inky.chasePlayer()
-        pinky.chasePlayer()
-    else:
+    kys = hero.getDirection()
+    if inky.isScared():
         blinky.runAway(currentPos)
+        inky.runAway(currentPos)
+        clyde.runAway(currentPos)
+        pinky.runAway(currentPos)
+    else:
+        blinky.chasePlayer(currentPos)
+        inky.chasePlayer(currentPos, kys, blinky.getPosition())
+        pinky.chasePlayer(currentPos, kys)
     blinky.Render()
     inky.Render()
     pinky.Render()
