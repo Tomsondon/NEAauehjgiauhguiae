@@ -1,5 +1,8 @@
+import os
 import board
 import pygame
+import datetime
+
 
 f = open("config.txt")
 config = f.read()
@@ -37,7 +40,7 @@ def getGridRef(x, y):
     return refX, refY
 
 
-def drawValue(text, variable, pos):
+def drawValue(text, variable, pos, screen):
     my_font = pygame.font.SysFont('Jokerman', 30)
     valText = f"{text}: {variable}"
     val_surface = my_font.render(valText, False, "White")
@@ -114,12 +117,12 @@ class Game:
                     return 1
         return 0
 
-    def Render(self):
+    def Render(self, screen):
         self._time = pygame.time.get_ticks()
-        drawValue("Score", self.__score, (0, 800))
-        drawValue("Time", self._time / 1000, (300, 800))
-        drawValue("Lives", self.__lives, (600, 800))
-        drawValue("Dots left", self.getDotsLeft(), (0, 900))
+        drawValue("Score", self.__score, (0, 800), screen)
+        drawValue("Time", self._time / 1000, (300, 800), screen)
+        drawValue("Lives", self.__lives, (600, 800), screen)
+        drawValue("Dots left", self.getDotsLeft(), (0, 900), screen)
         for x in self.__wallPositions:
             pygame.draw.rect(screen, "blue", x, 1)
         for y in self.__pelletPositions:
@@ -170,15 +173,17 @@ class Entity:
 
     def setPosition(self, pos):
         self._position = pos
+
     def getSpeed(self):
         return self._speed
-    def Render(self):
-        self.Update()
+
+    def Render(self, screen, dt):
+        self.Update(dt)
         self._boundBox = pygame.Rect(self._position.x, self._position.y, 24, 24)
         screen.blit(self._img, self._position)
         pygame.draw.rect(screen, "red", self._boundBox, 1)
 
-    def Update(self):
+    def Update(self, dt):
         if self._direction != 0:
             if self._direction == 1:
                 self._position.y -= self._speed * 300 * dt
@@ -207,12 +212,10 @@ class Player(Entity):
         else:
             self._direction = newDirection
 
-    def Update(self):
-        super().Update()
+    def Update(self, dt):
+        super().Update(dt)
         self._speed = 1
         print("balls")
-
-
 
     def Restart(self):
         self._position = pygame.Vector2(self.__startPoint[0] - 12, self.__startPoint[1] + 12)
@@ -265,8 +268,8 @@ class Ghost(Entity):
         self._isDead = True
         self._isScared = False
 
-    def Update(self):
-        super().Update()
+    def Update(self, dt):
+        super().Update(dt)
         if pygame.time.get_ticks() >= self._manUp:
             self._isScared = False
             self._img = pygame.transform.scale(pygame.image.load(self._imgJPG), (24, 24))
@@ -310,11 +313,11 @@ class Inky(Ghost):
         elif playerDir == 4:
             posArr[0] += 2 * 24
 
-        displacementVector = [0,0]
+        displacementVector = [0, 0]
         invDisplacementVector = list(blinkyPos - posArr)
         displacementVector[0] = -1 * invDisplacementVector[0]
         displacementVector[1] = -1 * invDisplacementVector[1]
-        targetVector = [0,0]
+        targetVector = [0, 0]
         targetVector[0] = displacementVector[0] + posArr[0]
         targetVector[1] = displacementVector[1] + posArr[1]
         self._direction = approachVector(pygame.Vector2(targetVector))
@@ -347,114 +350,135 @@ class Pinky(Ghost):
                 self._direction = 2
 
 
-##################################MAIN PROGRAM####################################################
-
-pygame.init()
-pygame.display.set_caption('PAC-MAN')
-print(u, d, l, r)
-# up = pygame.key.key_code(u)
-# down = pygame.key.key_code(d)                                                          dont work for some reason
-# left = pygame.key.key_code(l)
-# right = pygame.key.key_code(r)
-screen = pygame.display.set_mode((720, 960))  # sets resolution to 3:4
-clock = pygame.time.Clock()
-running = True
-fps = 240
-dt = 0
-level = 1
-game = Game(3, level)
-hero = Player()
-blinky = Blinky()
-inky = Inky()
-pinky = Pinky()
-clyde = Ghost(3)
-
-
-def ghostCollision():
-    if heroBox.colliderect(blinky.getBoundBox()) or heroBox.colliderect(inky.getBoundBox()) or heroBox.colliderect(
-            pinky.getBoundBox()) or heroBox.colliderect(clyde.getBoundBox()):
-        return True
+########################################################MAIN PROGRAM####################################################
+def main():
+    pygame.init()
+    pygame.display.set_caption('PAC-MAN')
+    print(u, d, l, r)
+    # up = pygame.key.key_code(u)
+    # down = pygame.key.key_code(d)                                                          dont work for some reason
+    # left = pygame.key.key_code(l)
+    # right = pygame.key.key_code(r)
+    screen = pygame.display.set_mode((720, 960))  # sets resolution to 3:4
+    clock = pygame.time.Clock()
+    running = True
+    fps = 240
+    dt = 0
+    level = 1
+    game = Game(3, level)
+    hero = Player()
+    blinky = Blinky()
+    inky = Inky()
+    pinky = Pinky()
+    clyde = Ghost(3)
 
 
-while running:
-    # poll for events
-    # pygame.QUIT event means the user clicked X to close your window
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+    def ghostCollision():
+        if heroBox.colliderect(blinky.getBoundBox()) or heroBox.colliderect(inky.getBoundBox()) or heroBox.colliderect(
+                pinky.getBoundBox()) or heroBox.colliderect(clyde.getBoundBox()):
+            return True
+
+
+    while running:
+        # poll for events
+        # pygame.QUIT event means the user clicked X to close your window
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        screen.fill("black")
+
+        currentPos = hero.getPosition()
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_w]:
+            hero.addDirection(1)
+        if keys[pygame.K_s]:
+            hero.addDirection(2)
+        if keys[pygame.K_a]:
+            hero.addDirection(3)
+        if keys[pygame.K_d]:
+            hero.addDirection(4)
+        if keys[pygame.K_ESCAPE]:
+            running = False
+        if game.getDotsLeft() == 0:
+            print("Level complete!")
             running = False
 
-    screen.fill("black")
+        drawValue("Speed", hero.getSpeed(), (400, 900), screen)
+        # if keys[pygame.K_t]:
+        # hero.addSpeed(-0.01)
+        #  if keys[pygame.K_y]:
+        #       hero.addSpeed(0.01)
+        #  if keys[pygame.K_p]:
+        #       print(hero.getPosition())
 
-    currentPos = hero.getPosition()
+        game.Render(screen)
+        hero.Render(screen, dt)
+        kys = hero.getDirection()
+        if inky.isScared():
+            blinky.runAway(currentPos)
+            inky.runAway(currentPos)
+            clyde.runAway(currentPos)
+            pinky.runAway(currentPos)
+        else:
+            blinky.chasePlayer(currentPos)
+            inky.chasePlayer(currentPos, kys, blinky.getPosition())
+            pinky.chasePlayer(currentPos, kys)
+        blinky.Render(screen, dt)
+        inky.Render(screen, dt)
+        pinky.Render(screen, dt)
+        clyde.Render(screen, dt)
 
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_w]:
-        hero.addDirection(1)
-    if keys[pygame.K_s]:
-        hero.addDirection(2)
-    if keys[pygame.K_a]:
-        hero.addDirection(3)
-    if keys[pygame.K_d]:
-        hero.addDirection(4)
-    if keys[pygame.K_ESCAPE]:
-        running = False
-    if game.getDotsLeft() == 0:
-        print("Level complete!")
-        running = False
+        heroBox = hero.getBoundBox()
+        # if game.collidesWithWall(heroBox):
+        # hero.setPosition(currentPos)
+        # hero.setDirection(0)
+        pelletCheck = game.collidesWithPellet(heroBox)
+        if pelletCheck == 1:
+            game.addScore(10)
+        elif pelletCheck == 2:
+            game.addScore(50)
+            blinky.scareGhost()
+            inky.scareGhost()
+            pinky.scareGhost()
+            clyde.scareGhost()
 
-    drawValue("Speed", hero.getSpeed(), (400,900))
-    #if keys[pygame.K_t]:
-        #hero.addSpeed(-0.01)
-  #  if keys[pygame.K_y]:
- #       hero.addSpeed(0.01)
-  #  if keys[pygame.K_p]:
- #       print(hero.getPosition())
+        if ghostCollision():
+            game.addLives(-1)
+            hero.Restart()
+            blinky = Blinky()
+            inky = Inky()
+            pinky = Pinky()
 
-    game.Render()
-    hero.Render()
-    kys = hero.getDirection()
-    if inky.isScared():
-        blinky.runAway(currentPos)
-        inky.runAway(currentPos)
-        clyde.runAway(currentPos)
-        pinky.runAway(currentPos)
+        if game.getLives() == 0:
+            print("Ran out of lives!")
+            running = False
+
+        # flip() the display to put your work on screen
+        pygame.display.flip()
+
+        clock.tick(fps)  # limits FPS to whatever was set at the start
+        dt = clock.tick(fps) / 1000
+
+
+    ###WRITE TO FILE###
+    currentTime = datetime.datetime.now()
+    if not (os.path.exists("leaderboard.txt")):
+        print("LEADERBOARD FILE DOES NOT EXIST, CREATING NEW LEADERBOARD FILE")
     else:
-        blinky.chasePlayer(currentPos)
-        inky.chasePlayer(currentPos, kys, blinky.getPosition())
-        pinky.chasePlayer(currentPos, kys)
-    blinky.Render()
-    inky.Render()
-    pinky.Render()
-    clyde.Render()
+        pass
 
-    heroBox = hero.getBoundBox()
-    # if game.collidesWithWall(heroBox):
-    # hero.setPosition(currentPos)
-    # hero.setDirection(0)
-    pelletCheck = game.collidesWithPellet(heroBox)
-    if pelletCheck == 1:
-        game.addScore(10)
-    elif pelletCheck == 2:
-        game.addScore(50)
-        blinky.scareGhost()
-        inky.scareGhost()
-        pinky.scareGhost()
-        clyde.scareGhost()
+    currentTime = datetime.datetime.now()
+    f = open("leaderboard.txt", "a")
+    f.write(str(currentTime.strftime("%x")))
+    f.write("   ")
+    f.write(str(game.getScore()))
+    f.write("   ")
+    f.write(str(game.getTime()))
+    f.write("\n")
+    f.close()
+########################################################################################################################
 
-    if ghostCollision():
-        game.addLives(-1)
-        hero.Restart()
-        blinky = Blinky()
-        inky = Inky()
-        pinky = Pinky()
-
-    if game.getLives() == 0:
-        print("Ran out of lives!")
-        running = False
-
-    # flip() the display to put your work on screen
-    pygame.display.flip()
-
-    clock.tick(fps)  # limits FPS to whatever was set at the start
-    dt = clock.tick(fps) / 1000
-pygame.quit()
+if __name__ == "__main__":
+    main()
