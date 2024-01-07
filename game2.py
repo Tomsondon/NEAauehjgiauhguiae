@@ -3,7 +3,6 @@ import board
 import pygame
 import datetime
 
-
 f = open("config.txt")
 config = f.read()
 f.close()
@@ -51,6 +50,10 @@ def createNodeMap(maze):
     nodeMap = board.createNodeMap(maze)
 
 
+def Square(x, y, size):
+    return pygame.Rect(x - size / 2, y - size / 2, size, size)
+
+
 class Game:
     def __init__(self, lives, Level):
         if Level == 1:
@@ -67,24 +70,15 @@ class Game:
             for i in range(len(self._board[j])):
                 pos = getCoord(i, j)
                 if self._board[j][i] == 1:
-                    self.__ogPelletPositions.append(pygame.Rect(pos[0] - 3, pos[1] - 3, 6, 6))
+                    self.__ogPelletPositions.append(Square(pos[0], pos[1], 6))
+                    self.__pelletPositions.append(Square(pos[0], pos[1], 6))
                     self.__dotsLeft += 1
                 elif self._board[j][i] == 2:
-                    self.__ogPelletPositions.append(pygame.Rect(pos[0] - 6, pos[1] - 6, 12, 12))
+                    self.__ogPelletPositions.append(Square(pos[0], pos[1], 12))
+                    self.__pelletPositions.append(Square(pos[0], pos[1], 12))
                     self.__dotsLeft += 1
-                elif self._board[j][i] > 2:
-                    self.__wallPositions.append(pygame.Rect(pos[0] - 12, pos[1] - 12, 24, 24))
-        for j in range(len(self._board)):
-            for i in range(len(self._board[j])):
-                pos = getCoord(i, j)
-                if self._board[j][i] == 1:
-                    self.__pelletPositions.append(pygame.Rect(pos[0] - 3, pos[1] - 3, 6, 6))
-                    self.__dotsLeft += 1
-                elif self._board[j][i] == 2:
-                    self.__pelletPositions.append(pygame.Rect(pos[0] - 6, pos[1] - 6, 12, 12))
-                    self.__dotsLeft += 1
-                elif self._board[j][i] > 2:
-                    self.__wallPositions.append(pygame.Rect(pos[0] - 12, pos[1] - 12, 24, 24))
+                elif self._board[j][i] == 3:
+                    self.__wallPositions.append(Square(pos[0], pos[1], 24))
 
     def addLives(self, lives):
         self.__lives += lives
@@ -123,10 +117,10 @@ class Game:
         drawValue("Time", self._time / 1000, (300, 800), screen)
         drawValue("Lives", self.__lives, (600, 800), screen)
         drawValue("Dots left", self.getDotsLeft(), (0, 900), screen)
-        for x in self.__wallPositions:
-            pygame.draw.rect(screen, "blue", x, 1)
-        for y in self.__pelletPositions:
-            pygame.draw.rect(screen, "white", y)
+        for i in self.__wallPositions:
+            pygame.draw.rect(screen, "blue", i, 1)
+        for i in self.__pelletPositions:
+            pygame.draw.rect(screen, "white", i)
 
     def getDotsLeft(self):
         return len(self.__pelletPositions)
@@ -134,15 +128,6 @@ class Game:
     def getTime(self):
         return self._time
 
-    def ihavenoideawhytheattributeissticky(self):
-        self.addLives(-1)
-        print("before")
-        print(self.__pelletPositions)
-        print(self.__ogPelletPositions)
-        self.__pelletPositions = self.__ogPelletPositions
-        print("after")
-        print(self.__pelletPositions)
-        print(self.__ogPelletPositions)
 
 
 class Entity:
@@ -152,7 +137,7 @@ class Entity:
         self._position = pygame.Vector2(position)
         self._direction = 0
         self._speed = 1
-        self._boundBox = pygame.Rect(self._position.x - 12, self._position.y - 12, 24, 24)
+        self._boundBox = Square(self._position.x, self._position.y, 24)
 
     def getBoundBox(self):
         return self._boundBox
@@ -179,9 +164,11 @@ class Entity:
 
     def Render(self, screen, dt):
         self.Update(dt)
-        self._boundBox = pygame.Rect(self._position.x, self._position.y, 24, 24)
-        screen.blit(self._img, self._position)
+        self._boundBox = Square(self._position.x, self._position.y, 24)
+        screen.blit(self._img, (self._position.x-12, self._position.y-12))
         pygame.draw.rect(screen, "red", self._boundBox, 1)
+        pygame.draw.circle(screen,"green",self._position,3)
+
 
     def Update(self, dt):
         if self._direction != 0:
@@ -202,8 +189,8 @@ class Entity:
 
 class Player(Entity):
     def __init__(self):
-        self.__startPoint = getCoord(14, 23)
-        Entity.__init__(self, "pictuer2 053.jpg", (self.__startPoint[0] - 12, self.__startPoint[1] + 12))
+        self.__startPoint = getCoord(14, 24)
+        Entity.__init__(self, "images/player.jpg", (self.__startPoint[0], self.__startPoint[1]))
         self.__nextDirection = 0
 
     def addDirection(self, newDirection):
@@ -215,10 +202,9 @@ class Player(Entity):
     def Update(self, dt):
         super().Update(dt)
         self._speed = 1
-        print("balls")
 
     def Restart(self):
-        self._position = pygame.Vector2(self.__startPoint[0] - 12, self.__startPoint[1] + 12)
+        self._position = pygame.Vector2(self.__startPoint[0], self.__startPoint[1])
         self._direction = 0
         self.__nextDirection = 0
         pygame.time.delay(1000)
@@ -228,13 +214,13 @@ class Ghost(Entity):
     def __init__(self, ghostType):  # 0 is blinky, 1 is inky, 2 is pinky, 3 is clyde
         self._manUp = 9999999999  # timer for scared phase, determines at what tick the ghost should stop being scared
         if ghostType == 0:
-            Entity.__init__(self, "blinky.jpg", (336, 384))
+            Entity.__init__(self, "images/blinky.jpg", (336, 384))
         elif ghostType == 1:
-            Entity.__init__(self, "inky.jpg", (336, 360))
+            Entity.__init__(self, "images/inky.jpg", (336, 360))
         elif ghostType == 2:
-            Entity.__init__(self, "pinky.jpg", (312, 384))
+            Entity.__init__(self, "images/pinky.jpg", (312, 384))
         elif ghostType == 3:
-            Entity.__init__(self, "clyde.jpg", (312, 360))
+            Entity.__init__(self, "images/clyde.jpg", (312, 360))
         self._isScared = False
         self._isDead = False
         self._chaseMode = 1  # 0 is scatter state, 1 is chase state
@@ -242,7 +228,7 @@ class Ghost(Entity):
     def scareGhost(self):
         self._manUp = pygame.time.get_ticks() + 5000
         self._isScared = True
-        self._img = pygame.transform.scale(pygame.image.load("scared.jpg"), (24, 24))
+        self._img = pygame.transform.scale(pygame.image.load("images/scared.jpg"), (24, 24))
         self._speed = 0.5
         if self._direction != 0:
             if self._direction // 2 == 0:
@@ -372,16 +358,12 @@ def main():
     pinky = Pinky()
     clyde = Ghost(3)
 
-
     def ghostCollision():
         if heroBox.colliderect(blinky.getBoundBox()) or heroBox.colliderect(inky.getBoundBox()) or heroBox.colliderect(
                 pinky.getBoundBox()) or heroBox.colliderect(clyde.getBoundBox()):
             return True
 
-
     while running:
-        # poll for events
-        # pygame.QUIT event means the user clicked X to close your window
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -455,15 +437,12 @@ def main():
             print("Ran out of lives!")
             running = False
 
-        # flip() the display to put your work on screen
         pygame.display.flip()
 
-        clock.tick(fps)  # limits FPS to whatever was set at the start
+        clock.tick(fps)
         dt = clock.tick(fps) / 1000
 
-
     ###WRITE TO FILE###
-    currentTime = datetime.datetime.now()
     if not (os.path.exists("leaderboard.txt")):
         print("LEADERBOARD FILE DOES NOT EXIST, CREATING NEW LEADERBOARD FILE")
     else:
@@ -478,6 +457,8 @@ def main():
     f.write(str(game.getTime()))
     f.write("\n")
     f.close()
+
+
 ########################################################################################################################
 
 if __name__ == "__main__":
