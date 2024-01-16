@@ -46,10 +46,6 @@ def drawValue(text, variable, pos, screen):
     screen.blit(val_surface, pos)
 
 
-def createNodeMap(maze):
-    nodeMap = board.createNodeMap(maze)
-
-
 def Square(x, y, size):
     return pygame.Rect(x - size / 2, y - size / 2, size, size)
 
@@ -66,6 +62,8 @@ class Game:
         self.__pelletPositions = []
         self.__ogPelletPositions = []
         self.__pelletPositions = []
+        self.__junctionPositions = []
+
         for j in range(len(self._board)):
             for i in range(len(self._board[j])):
                 pos = getCoord(i, j)
@@ -79,6 +77,10 @@ class Game:
                     self.__dotsLeft += 1
                 elif self._board[j][i] == 3:
                     self.__wallPositions.append(Square(pos[0], pos[1], 24))
+
+        for junctions in board.mazeMapping(self._board):
+            pos = getCoord(junctions[1], junctions[0])
+            self.__junctionPositions.append(Square(pos[0], pos[1], 3))
 
     def addLives(self, lives):
         self.__lives += lives
@@ -94,6 +96,9 @@ class Game:
 
     def getBoard(self):
         return self._board
+
+    def getJunctionPositions(self):
+        return self.__junctionPositions
 
     def collidesWithWall(self, rect):
         for i in self.__wallPositions:
@@ -119,15 +124,16 @@ class Game:
         drawValue("Dots left", self.getDotsLeft(), (0, 900), screen)
         for i in self.__wallPositions:
             pygame.draw.rect(screen, "blue", i, 1)
-        for i in self.__pelletPositions:
-            pygame.draw.rect(screen, "white", i)
+        #for i in self.__pelletPositions:
+            #pygame.draw.rect(screen, "white", i)
+        for i in self.__junctionPositions:
+            pygame.draw.rect(screen, "yellow", i, 1)
 
     def getDotsLeft(self):
         return len(self.__pelletPositions)
 
     def getTime(self):
         return self._time
-
 
 
 class Entity:
@@ -163,14 +169,13 @@ class Entity:
         return self._speed
 
     def Render(self, screen, dt):
-        self.Update(dt)
+        self.Move(dt)
         self._boundBox = Square(self._position.x, self._position.y, 24)
-        screen.blit(self._img, (self._position.x-12, self._position.y-12))
+        screen.blit(self._img, (self._position.x - 12, self._position.y - 12))
         pygame.draw.rect(screen, "red", self._boundBox, 1)
-        pygame.draw.circle(screen,"green",self._position,3)
+        pygame.draw.circle(screen, "green", self._position, 3)
 
-
-    def Update(self, dt):
+    def Move(self, dt):
         if self._direction != 0:
             if self._direction == 1:
                 self._position.y -= self._speed * 300 * dt
@@ -193,15 +198,16 @@ class Player(Entity):
         Entity.__init__(self, "images/player.jpg", (self.__startPoint[0], self.__startPoint[1]))
         self.__nextDirection = 0
 
-    def addDirection(self, newDirection):
-        if self._direction == 0:
+    def addDirection(self, newDirection, maze):
+        atJunction = False
+        for i in maze.getJunctionPositions():
+            if Square(self._position[0], self._position[1], 1).colliderect(i):
+                atJunction = True
+                break
+        if atJunction or (self._direction == 0):
             self._direction = newDirection
         else:
-            self._direction = newDirection
-
-    def Update(self, dt):
-        super().Update(dt)
-        self._speed = 1
+            self.__nextDirection = newDirection
 
     def Restart(self):
         self._position = pygame.Vector2(self.__startPoint[0], self.__startPoint[1])
@@ -374,13 +380,13 @@ def main():
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_w]:
-            hero.addDirection(1)
+            hero.addDirection(1, game)
         if keys[pygame.K_s]:
-            hero.addDirection(2)
+            hero.addDirection(2, game)
         if keys[pygame.K_a]:
-            hero.addDirection(3)
+            hero.addDirection(3, game)
         if keys[pygame.K_d]:
-            hero.addDirection(4)
+            hero.addDirection(4, game)
         if keys[pygame.K_ESCAPE]:
             running = False
         if game.getDotsLeft() == 0:
