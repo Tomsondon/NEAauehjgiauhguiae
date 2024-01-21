@@ -1,5 +1,5 @@
 import os
-import board
+import boards
 import pygame
 import datetime
 
@@ -32,11 +32,9 @@ def getCoord(x, y):
 
 
 def getGridRef(x, y):
-    refX = (x - 12) // 24
-    if refX > 29:
-        refX = 29
-    refY = (y - 12) // 24
-    return refX, refY
+    refX = x // 24
+    refY = y // 24
+    return int(refX), int(refY)
 
 
 def drawValue(text, variable, pos, screen):
@@ -51,9 +49,8 @@ def Square(x, y, size):
 
 
 class Game:
-    def __init__(self, lives, Level):
-        if Level == 1:
-            self._board = board.boards
+    def __init__(self, lives, Level, maze):
+        self._board = maze
         self._time = pygame.time.get_ticks()
         self.__dotsLeft = 0
         self.__score = 0
@@ -78,7 +75,7 @@ class Game:
                 elif self._board[j][i] == 3:
                     self.__wallPositions.append(Square(pos[0], pos[1], 24))
 
-        for junctions in board.mazeMapping(self._board):
+        for junctions in boards.mazeMapping(self._board):
             pos = getCoord(junctions[1], junctions[0])
             self.__junctionPositions.append(Square(pos[0], pos[1], 3))
 
@@ -124,10 +121,8 @@ class Game:
         drawValue("Dots left", self.getDotsLeft(), (0, 900), screen)
         for i in self.__wallPositions:
             pygame.draw.rect(screen, "blue", i, 1)
-        #for i in self.__pelletPositions:
-            #pygame.draw.rect(screen, "white", i)
-        for i in self.__junctionPositions:
-            pygame.draw.rect(screen, "yellow", i, 1)
+        for i in self.__pelletPositions:
+            pygame.draw.rect(screen, "white", i)
 
     def getDotsLeft(self):
         return len(self.__pelletPositions)
@@ -198,16 +193,16 @@ class Player(Entity):
         Entity.__init__(self, "images/player.jpg", (self.__startPoint[0], self.__startPoint[1]))
         self.__nextDirection = 0
 
-    def addDirection(self, newDirection, maze):
-        atJunction = False
-        for i in maze.getJunctionPositions():
-            if Square(self._position[0], self._position[1], 1).colliderect(i):
-                atJunction = True
-                break
-        if atJunction or (self._direction == 0):
-            self._direction = newDirection
-        else:
-            self.__nextDirection = newDirection
+    def addDirection(self, newDirection, isFree):
+        if newDirection != self._direction:
+            if isFree:
+                self._direction = newDirection
+                self.__nextDirection = 0
+                print(self._direction)
+            else:
+                self.__nextDirection = newDirection
+        print("Current Direction", self._direction)
+        print("Next Direction", self.__nextDirection)
 
     def Restart(self):
         self._position = pygame.Vector2(self.__startPoint[0], self.__startPoint[1])
@@ -270,6 +265,7 @@ class Ghost(Entity):
 
     def isScared(self):
         return self._isScared
+
 
 
 class Blinky(Ghost):
@@ -357,7 +353,7 @@ def main():
     fps = 240
     dt = 0
     level = 1
-    game = Game(3, level)
+    game = Game(3, level, boards.boardsdict["default"])
     hero = Player()
     blinky = Blinky()
     inky = Inky()
@@ -377,16 +373,37 @@ def main():
         screen.fill("black")
 
         currentPos = hero.getPosition()
+        gridPosition = getGridRef(currentPos[0], currentPos[1])
 
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_w]:
-            hero.addDirection(1, game)
-        if keys[pygame.K_s]:
-            hero.addDirection(2, game)
-        if keys[pygame.K_a]:
-            hero.addDirection(3, game)
-        if keys[pygame.K_d]:
-            hero.addDirection(4, game)
+        try:
+            if keys[pygame.K_w]:
+                if game.getBoard()[gridPosition[1] - 1][gridPosition[0]] != 3:
+                    hero.addDirection(1, True)
+                else:
+                    hero.addDirection(1, False)
+
+            if keys[pygame.K_s]:
+                if game.getBoard()[gridPosition[1] + 1][gridPosition[0]] != 3:
+                    hero.addDirection(2, True)
+                else:
+                    hero.addDirection(2, False)
+
+            if keys[pygame.K_a]:
+                if game.getBoard()[gridPosition[1]][gridPosition[1] - 1] != 3:
+                    hero.addDirection(3, True)
+                else:
+                    hero.addDirection(3, False)
+
+            if keys[pygame.K_d]:
+                if game.getBoard()[gridPosition[1]][gridPosition[1] + 1] != 3:
+                    hero.addDirection(4, True)
+                else:
+                    hero.addDirection(4, False)
+        except:
+            print("we fucked up lol")
+            pass
+
         if keys[pygame.K_ESCAPE]:
             running = False
         if game.getDotsLeft() == 0:
