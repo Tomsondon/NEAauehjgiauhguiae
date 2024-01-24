@@ -77,7 +77,7 @@ class Game:
 
         for junctions in boards.mazeMapping(self._board):
             pos = getCoord(junctions[1], junctions[0])
-            self.__junctionPositions.append(Square(pos[0], pos[1], 3))
+            self.__junctionPositions.append(Square(pos[0], pos[1], 2))
 
     def addLives(self, lives):
         self.__lives += lives
@@ -123,12 +123,20 @@ class Game:
             pygame.draw.rect(screen, "blue", i, 1)
         for i in self.__pelletPositions:
             pygame.draw.rect(screen, "white", i)
+        for i in self.__junctionPositions:
+            pygame.draw.rect(screen, "yellow", i, 3)
 
     def getDotsLeft(self):
         return len(self.__pelletPositions)
 
     def getTime(self):
         return self._time
+
+    def inJunction(self, xcoord, ycoord):
+        for junctions in self.getJunctionPositions():
+            if junctions.collidepoint(xcoord, ycoord):
+                return True
+        return False
 
 
 class Entity:
@@ -164,27 +172,28 @@ class Entity:
         return self._speed
 
     def Render(self, screen, dt):
-        self.Move(dt)
+        self.UpdatePos(dt)
         self._boundBox = Square(self._position.x, self._position.y, 24)
         screen.blit(self._img, (self._position.x - 12, self._position.y - 12))
         pygame.draw.rect(screen, "red", self._boundBox, 1)
         pygame.draw.circle(screen, "green", self._position, 3)
 
-    def Move(self, dt):
-        if self._direction != 0:
-            if self._direction == 1:
-                self._position.y -= self._speed * 300 * dt
-            if self._direction == 2:
-                self._position.y += self._speed * 300 * dt
-            if self._direction == 3:
-                self._position.x -= self._speed * 300 * dt
-            if self._direction == 4:
-                self._position.x += self._speed * 300 * dt
+    def UpdatePos(self, dt):  # Direction 1 is up, 2 is down, 3 is left, 4 is right
+        if self._direction == 1:
+            self._position.y -= self._speed * 300 * dt
+        if self._direction == 2:
+            self._position.y += self._speed * 300 * dt
+        if self._direction == 3:
+            self._position.x -= self._speed * 300 * dt
+        if self._direction == 4:
+            self._position.x += self._speed * 300 * dt
+        if self._direction == 0:
+            print("lmaooo")
 
-            if self._position.x < 0:
-                self._position.x = 720
-            if self._position.x > 720:
-                self._position.x = 0
+        if self._position.x < 0:
+            self._position.x = 720
+        if self._position.x > 720:
+            self._position.x = 0
 
 
 class Player(Entity):
@@ -194,13 +203,12 @@ class Player(Entity):
         self.__nextDirection = 0
 
     def addDirection(self, newDirection, isFree):
-        if newDirection != self._direction:
-            if isFree:
-                self._direction = newDirection
-                self.__nextDirection = 0
-                print(self._direction)
-            else:
-                self.__nextDirection = newDirection
+        if isFree:
+            self._direction = newDirection
+            self.__nextDirection = 0
+            print(self._direction)
+        else:
+            self.__nextDirection = newDirection
         print("Current Direction", self._direction)
         print("Next Direction", self.__nextDirection)
 
@@ -265,7 +273,6 @@ class Ghost(Entity):
 
     def isScared(self):
         return self._isScared
-
 
 
 class Blinky(Ghost):
@@ -365,6 +372,34 @@ def main():
                 pinky.getBoundBox()) or heroBox.colliderect(clyde.getBoundBox()):
             return True
 
+    def incomingCollision(direction):
+        if direction == 1:
+            if game.getBoard()[gridPosition[1] - 1][gridPosition[0]] == 3:
+                return True
+            else:
+                return False
+
+        if direction == 2:
+            if game.getBoard()[gridPosition[1] + 1][gridPosition[0]] == 3:
+                return True
+            else:
+                return False
+
+        if direction == 3:
+            if game.getBoard()[gridPosition[1]][gridPosition[0] - 1] == 3:
+                return True
+            else:
+                return False
+
+        if direction == 4:
+            if game.getBoard()[gridPosition[1]][gridPosition[0] + 1] == 3:
+                return True
+            else:
+                return False
+
+        else:
+            return False
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -375,34 +410,30 @@ def main():
         currentPos = hero.getPosition()
         gridPosition = getGridRef(currentPos[0], currentPos[1])
 
+        newDirection = 0
         keys = pygame.key.get_pressed()
-        try:
+        if keys[pygame.K_w]:
+            newDirection = 1
+        elif keys[pygame.K_s]:
+            newDirection = 2
+        elif keys[pygame.K_a]:
+            newDirection = 3
+        elif keys[pygame.K_d]:
+            newDirection = 4
+
+        if game.inJunction(currentPos.x, currentPos.y):
+            print("inside junction")
+            if incomingCollision(hero.getDirection()):
+                hero.addDirection(0, True)
+
             if keys[pygame.K_w]:
-                if game.getBoard()[gridPosition[1] - 1][gridPosition[0]] != 3:
-                    hero.addDirection(1, True)
-                else:
-                    hero.addDirection(1, False)
-
-            if keys[pygame.K_s]:
-                if game.getBoard()[gridPosition[1] + 1][gridPosition[0]] != 3:
-                    hero.addDirection(2, True)
-                else:
-                    hero.addDirection(2, False)
-
-            if keys[pygame.K_a]:
-                if game.getBoard()[gridPosition[1]][gridPosition[1] - 1] != 3:
-                    hero.addDirection(3, True)
-                else:
-                    hero.addDirection(3, False)
-
-            if keys[pygame.K_d]:
-                if game.getBoard()[gridPosition[1]][gridPosition[1] + 1] != 3:
-                    hero.addDirection(4, True)
-                else:
-                    hero.addDirection(4, False)
-        except:
-            print("we fucked up lol")
-            pass
+                hero.addDirection(1, not (incomingCollision(1)))
+            elif keys[pygame.K_s]:
+                hero.addDirection(2, not (incomingCollision(2)))
+            elif keys[pygame.K_a]:
+                hero.addDirection(3, not (incomingCollision(3)))
+            elif keys[pygame.K_d]:
+                hero.addDirection(4, not (incomingCollision(4)))
 
         if keys[pygame.K_ESCAPE]:
             running = False
