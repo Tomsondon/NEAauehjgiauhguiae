@@ -496,21 +496,15 @@ def main():
         clock.tick(fps)
         dt = clock.tick(fps) / 1000
 
-    ###WRITE TO FILE###
-    if not (os.path.exists("leaderboard.txt")):
-        print("LEADERBOARD FILE DOES NOT EXIST, CREATING NEW LEADERBOARD FILE")
-    else:
-        pass
+    ###INPUT TO DATABASE###
+
+    leaderboard = database.Leaderboard()
+
+    userName = input("Enter Name: ")
 
     currentTime = datetime.datetime.now()
-    f = open("leaderboard.txt", "a")
-    f.write(str(currentTime.strftime("%x")))
-    f.write("   ")
-    f.write(str(game.getScore()))
-    f.write("   ")
-    f.write(str(game.getTime()))
-    f.write("\n")
-    f.close()
+    leaderboard.InputScore(userName, str(currentTime.strftime("%x")), game.getTime(), game.getScore())
+    leaderboard.Close()
 
 
 ########################################################################################################################
