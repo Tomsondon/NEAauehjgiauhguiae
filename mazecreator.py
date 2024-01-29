@@ -1,5 +1,5 @@
 import pygame
-from game import Board, getCoord, getGridRef
+from game import Board, getCoord, getGridRef, Square
 import boards
 from structures import EventStack
 
@@ -20,7 +20,6 @@ class Creator(Board):
     def pushToEventStack(self, value):
         self.eventStack.push(value)
 
-
     def changeCell(self, x, y, val):
         try:
             self._board[y][x] = val
@@ -28,9 +27,9 @@ class Creator(Board):
             print("Out of range!")
 
     def checkGridType(self, x, y):
-        if x == 0 or x == 32:
+        if x == 0 or x == 29:
             return 1
-        if y == 0 or y == 29:
+        if y == 0 or y == 32:
             return 2
         else:
             return 3
@@ -51,7 +50,7 @@ class Creator(Board):
                 elif self._board[i][j] == 2:
                     pygame.draw.circle(screen, "white", pos, 6)
                 elif self._board[i][j] == 3:
-                    pygame.draw.circle(screen, "blue", pos, 12)
+                    pygame.draw.rect(screen, "blue", Square(pos[0], pos[1], 24), 1)
 
 
 def main():
@@ -62,6 +61,7 @@ def main():
     running = True
     print(board)
     customBoard = Creator(board)
+    print("bruhbruh")
     saveButton = pygame.Rect((600, 900), (100, 50))
     changedCells = {}
     keyHeld = False
@@ -86,15 +86,25 @@ def main():
         if pygame.mouse.get_pressed()[0]:
             if saveButton.collidepoint(pygame.mouse.get_pos()):
                 running = False
+                name = input("Enter maze name: ")
+                boards.boardsdict.update({name: customBoard.getBoard()})
             else:
                 currentPos = getGridRef(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
-                if not (customBoard.isBorderCell(currentPos[0], currentPos[1])) and customBoard.getBoard()[currentPos[1]][currentPos[0]] != 3:
+                if not (0 <= currentPos[0] <= 29) or not (0 <= currentPos[1] <= 32):
+                    print("Out of bounds")
+                    continue
+                if not (customBoard.isBorderCell(currentPos[0], currentPos[1])) and \
+                        customBoard.getBoard()[currentPos[1]][currentPos[0]] != 3:
                     currentPos = getGridRef(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
                     customBoard.changeCell(currentPos[0], currentPos[1], 3)
                     changedCells.update({currentPos: 0})
         elif pygame.mouse.get_pressed()[2]:
             currentPos = getGridRef(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
-            if not (customBoard.isBorderCell(currentPos[1], currentPos[0])) and customBoard.getBoard()[currentPos[1]][currentPos[0]] != 0:
+            if not (0 <= currentPos[0] <= 29) or not (0 <= currentPos[1] <= 32):
+                print("Out of bounds")
+                continue
+            if not (customBoard.isBorderCell(currentPos[1], currentPos[0])) and customBoard.getBoard()[currentPos[1]][
+                currentPos[0]] != 0:
                 currentPos = getGridRef(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
                 customBoard.changeCell(currentPos[0], currentPos[1], 0)
                 changedCells.update({currentPos: 3})
@@ -106,7 +116,7 @@ def main():
             saveText = my_font.render("Save", False, (200, 200, 200))
             screen.blit(saveText, (610, 900))
 
-        if keys[pygame.K_z] and not(keyHeld):
+        if keys[pygame.K_z] and not (keyHeld):
             customBoard.undo()
             keyHeld = True
 
@@ -115,3 +125,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# CREATE A STACK TO STORE CHANGES AND ALLOW UNDOS -DONE
+# CREATE A GHOST Cell THAT CANT BE WRITTEN OVER- FUCK THAT LMAOOO
+# DO BFS WHEN SAVING MAZE TO MAZE SURE ITS VALID -DO ON MONDAY
