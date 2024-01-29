@@ -7,14 +7,15 @@ import datetime
 # import database
 import tkinter
 import random
+import math
 
 f = open("config.txt")
 config = f.read()
 f.close()
 u = config[19:22]
-d = config[30:34]
-l = config[41:45]
-r = config[53:57]
+d = config[30:33]
+l = config[43:44]
+r = config[53:56]
 
 
 def getCoord(x, y):
@@ -296,8 +297,6 @@ class Entity:
             self._position.x -= self._speed * 300 * dt
         if self._direction == 4:
             self._position.x += self._speed * 300 * dt
-        if self._direction == 0:
-            print("lmaooo")
 
         if self._position.x < 0:
             self._position.x = 720
@@ -346,7 +345,7 @@ class Ghost(Entity):
         self._speed = 0.5
 
     def runAway(self, vector):
-        targetVector = self.getPosition() - vector   # When running away, this is the vector the ghosts target.
+        targetVector = self.getPosition() - vector  # When running away, this is the vector the ghosts target.
         return getDirectionPreference(targetVector)  # It is the vector opposite the vector facing pac-man
 
     def killGhost(self):
@@ -496,11 +495,59 @@ class PlayerGhosts(GhostGroup):  # This class is useful for multiplayer
         self.__ghosts.remove(player)
 
 
+class Movement:
+    def __init__(self, board, pacman, blinky):
+        self._board = board
+        self._pacman = pacman
+        self._blinky = blinky
+
+    def moveCPU(self, ghost):
+        if not (ghost.isDead()) and self._board.coordInJunction(ghost.getPosition()[0],ghost.getPosition()[1]):
+            if ghost.isScared():
+                chaseDirections = ghost.runAway(self._pacman.getPosition())
+            else:
+                try:
+                    chaseDirections = ghost.getChaseDirections(self._pacman.getPosition())
+                except:
+                    try:
+                        chaseDirections = ghost.getChaseDirections(self._pacman.getPosition(),
+                                                                   self._pacman.getDirection())
+                    except:
+                        chaseDirections = ghost.getChaseDirections(self._pacman.getPosition(),
+                                                                   self._pacman.getDirection(),
+                                                                   self._blinky.getPosition())
+            position = ghost.getPosition()
+            gridPosition = getGridRef(position[0], position[1])
+            for direction in chaseDirections:
+                if not (self._board.isNextBlockWall(direction, gridPosition)):
+                    ghost.setDirection(direction)
+                    break
+
+    def movePlayer(self, player, movementKeys):
+        keys = pygame.key.get_pressed()
+        position = player.getPosition()
+        gridPosition = getGridRef(position[0], position[1])
+        newDirection = 0
+        for key in movementKeys:
+            if keys[pygame.key.key_code(key)]:
+                newDirection = movementKeys.index(key) + 1
+                print(newDirection)
+                break
+        if player.getDirection() == 0 or math.ceil(newDirection / 2) == math.ceil(
+                player.getDirection() / 2) or self._board.coordInJunction(player.getPosition()[0], player.getPosition()[1]):  # 1-2 returns 1, 3-4 returns 2, 0 returns 0
+            if not (self._board.isNextBlockWall(newDirection, gridPosition)):
+                if newDirection != 0:
+                    player.setDirection(newDirection)
+
+        if self._board.coordInJunction(player.getPosition()[0], player.getPosition()[1]) and self._board.isNextBlockWall(
+                player.getDirection(), gridPosition):
+            player.setDirection(0)
+
+
 ########################################################MAIN PROGRAM####################################################
 def main(players):
     pygame.init()
     pygame.display.set_caption('PAC-MAN')
-    print(u, d, l, r)
     # up = pygame.key.key_code(u)
     # down = pygame.key.key_code(d)                                                          dont work for some reason
     # left = pygame.key.key_code(l)
@@ -520,6 +567,14 @@ def main(players):
     pinky = Pinky()
     clyde = Clyde()
     ghosts = GhostGroup(blinky, inky, pinky, clyde)
+    movement = Movement(board, pacman, blinky)
+    playerKeys = ["w", "s", "a", "d"]
+    player2Keys = ["i","k","j","l"]
+    #player2Keys.append(u)
+    #player2Keys.append(d)
+    #player2Keys.append(l)
+    #player2Keys.append(r)
+    #print(player2Keys)
 
     if extraPlayers == 1:
         playerGhosts = PlayerGhosts(blinky)
@@ -553,63 +608,20 @@ def main(players):
 
         screen.fill("black")
 
-        currentPos = pacman.getPosition()
-
-        newDirection = 0
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_w]:
-            newDirection = 1
-        elif keys[pygame.K_s]:
-            newDirection = 2
-        elif keys[pygame.K_a]:
-            newDirection = 3
-        elif keys[pygame.K_d]:
-            newDirection = 4
-
-        if keys[pygame.K_ESCAPE]:
-            running = False
-        if board.getDotsLeft() == 0 or keys[pygame.K_j]:
+        if board.getDotsLeft() == 0:
             print("Level complete!")
             game.loadNextLevel()
 
         drawValue("Speed", pacman.getSpeed(), (400, 900), screen)
-        if keys[pygame.K_t]:
-            pacman.addSpeed(-0.01)
-        if keys[pygame.K_y]:
-            pacman.addSpeed(0.01)
-        if keys[pygame.K_p]:
-            print(pacman.getPosition())
-
-        pacmanDirection = pacman.getDirection()
         for ghost in ghosts.getGhosts():
             if ghost in playerGhosts.getGhosts():
-                pass  # do the player stuff
-            elif ghost in botGhosts.getGhosts() and board.coordInJunction(ghost.getPosition()[0],
-                                                                          ghost.getPosition()[1]) and not(ghost.isDead()):
-                if ghost.isScared():
-                    chaseDirections = ghost.runAway(currentPos)
-                else:
-                    try:
-                        chaseDirections = ghost.getChaseDirections(currentPos)
-                    except:
-                        try:
-                            chaseDirections = ghost.getChaseDirections(currentPos, pacmanDirection)
-                        except:
-                            chaseDirections = ghost.getChaseDirections(currentPos, pacmanDirection,
-                                                                       blinky.getPosition())
-                position = ghost.getPosition()
-                gridPosition = getGridRef(position[0], position[1])
-                for direction in chaseDirections:
-                    if not (board.isNextBlockWall(direction, gridPosition)):
-                        ghost.setDirection(direction)
-                        break
+                movement.movePlayer(ghost, player2Keys)  # change this later
+            elif ghost in botGhosts.getGhosts():
+                movement.moveCPU(ghost)
 
-        pacman.setDirection(newDirection)
+        movement.movePlayer(pacman, playerKeys)
 
         pacmanBox = pacman.getBoundBox()
-        # if game.collidesWithWall(pacmanBox):
-        # pacman.setPosition(currentPos)
-        # pacman.setDirection(0)
         pelletCheck = board.collidesWithPellet(pacmanBox)
         if pelletCheck == 1:
             game.addScore(10)
