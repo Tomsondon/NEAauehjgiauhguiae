@@ -1,11 +1,12 @@
 import os
 from tkinter import messagebox
-
+import time
 import boards
 import pygame
 import datetime
-import database
+# import database
 import tkinter
+import random
 
 f = open("config.txt")
 config = f.read()
@@ -14,19 +15,6 @@ u = config[19:22]
 d = config[30:34]
 l = config[41:45]
 r = config[53:57]
-
-
-def approachVector(vector):
-    if vector.x ** 2 > vector.y ** 2:
-        if vector.x < 0:
-            return 3
-        else:
-            return 4
-    else:
-        if vector.y < 0:
-            return 1
-        else:
-            return 2
 
 
 def getCoord(x, y):
@@ -39,6 +27,49 @@ def getGridRef(x, y):
     refX = x // 24
     refY = y // 24
     return int(refX), int(refY)
+
+
+def getDirectionPreference(vector):
+    directionPreference = []
+    if vector.x ** 2 > vector.y ** 2:
+        if vector.x < 0:
+            directionPreference.append(3)
+            if vector.y < 0:
+                directionPreference.append(1)
+                directionPreference.append(2)
+            else:
+                directionPreference.append(2)
+                directionPreference.append(1)
+            directionPreference.append(4)
+        else:
+            directionPreference.append(4)
+            if vector.y < 0:
+                directionPreference.append(1)
+                directionPreference.append(2)
+            else:
+                directionPreference.append(2)
+                directionPreference.append(1)
+            directionPreference.append(3)
+    else:
+        if vector.y < 0:
+            directionPreference.append(1)
+            if vector.x < 0:
+                directionPreference.append(3)
+                directionPreference.append(4)
+            else:
+                directionPreference.append(4)
+                directionPreference.append(3)
+            directionPreference.append(2)
+        else:
+            directionPreference.append(2)
+            if vector.x < 0:
+                directionPreference.append(3)
+                directionPreference.append(4)
+            else:
+                directionPreference.append(4)
+                directionPreference.append(3)
+            directionPreference.append(1)
+    return directionPreference
 
 
 def drawValue(text, variable, pos, screen):
@@ -118,8 +149,8 @@ class Board:
         for i in self.__junctionPositions:
             pygame.draw.rect(screen, "yellow", i, 3)
 
-    def resetBoard(self):
-        for pellet in self.__ogPelletPositions:
+    def resetBoard(self):  # method is implemented like this rather than a simple assignment statement
+        for pellet in self.__ogPelletPositions:  # to avoid the original list being permanently associated with the modified list
             self.__pelletPositions.append(pellet)
 
     def getCoord(self, x, y):
@@ -131,6 +162,34 @@ class Board:
         refX = x // 24
         refY = y // 24
         return int(refX), int(refY)
+
+    def isNextBlockWall(self, direction, gridPosition):
+        if direction == 1:
+            if self._board[gridPosition[1] - 1][gridPosition[0]] == 3:
+                return True
+            else:
+                return False
+
+        if direction == 2:
+            if self._board[gridPosition[1] + 1][gridPosition[0]] == 3:
+                return True
+            else:
+                return False
+
+        if direction == 3:
+            if self._board[gridPosition[1]][gridPosition[0] - 1] == 3:
+                return True
+            else:
+                return False
+
+        try:
+            if direction == 4:
+                if self._board[gridPosition[1]][gridPosition[0] + 1] == 3:
+                    return True
+                else:
+                    return False
+        except IndexError:  # Error handling for the case where the player enters a right side warp; in this case there wouldn't be an incoming collision
+            return False
 
 
 class Game:
@@ -161,12 +220,24 @@ class Game:
 
     def loadNextLevel(self):
         self.__level += 1
-        self._board.Reset()
+        self._board.resetBoard()
         self._ghosts.resetGhosts()
-        self._pacman.reset()
+        self._pacman.restart()
+        time.sleep(2)
 
-    def render(self, screen):
+    def loseLevel(self):
+        self.__lives -= 1
+        self._ghosts.resetGhosts()
+        self._pacman.restart()
+        time.sleep(1)
+
+    def render(self, screen, dt):
         self._time = pygame.time.get_ticks() - self.__originalTime
+        self._board.render(screen)
+        self._pacman.render(screen, dt)
+        for ghost in self._ghosts.getGhosts():
+            ghost.render(screen, dt)
+
         drawValue("Score", self.__score, (0, 800), screen)
         drawValue("Time", self._time / 1000, (300, 800), screen)
         drawValue("Lives", self.__lives, (600, 800), screen)
@@ -177,7 +248,7 @@ class Game:
 
 
 class Entity:
-    def __init__(self, img, position, isPlayer):
+    def __init__(self, img, position):
         self._imgJPG = img
         self._img = pygame.transform.scale(pygame.image.load(img), (24, 24))
         self._startPos = position
@@ -185,7 +256,6 @@ class Entity:
         self._direction = 0
         self._speed = 1
         self._boundBox = Square(self._position.x, self._position.y, 24)
-        self._isPlayer = isPlayer
 
     def getBoundBox(self):
         return self._boundBox
@@ -238,37 +308,24 @@ class Entity:
 class Pacman(Entity):
     def __init__(self):
         self.__startPoint = getCoord(14, 24)
-        Entity.__init__(self, "images/player.jpg", (self.__startPoint[0], self.__startPoint[1]), True)
-        self.__nextDirection = 0
-
-    def addDirection(self, newDirection, isFree):
-        if isFree:
-            self._direction = newDirection
-            self.__nextDirection = 0
-            print(self._direction)
-        else:
-            self.__nextDirection = newDirection
-        print("Current Direction", self._direction)
-        print("Next Direction", self.__nextDirection)
+        Entity.__init__(self, "images/player.jpg", (self.__startPoint[0], self.__startPoint[1]))
 
     def restart(self):
         self._position = pygame.Vector2(self.__startPoint[0], self.__startPoint[1])
         self._direction = 0
-        self.__nextDirection = 0
-        pygame.time.delay(1000)
 
 
 class Ghost(Entity):
-    def __init__(self, ghostType, isPlayer):  # 0 is blinky, 1 is inky, 2 is pinky, 3 is clyde
-        self._manUp = 9999999999  # timer for scared phase, determines at what tick the ghost should stop being scared
+    def __init__(self, ghostType):  # 0 is blinky, 1 is inky, 2 is pinky, 3 is clyde
+        self._normalTick = 9999999999  # timer for scared phase, determines at what tick the ghost should stop being scared
         if ghostType == 0:
-            Entity.__init__(self, "images/blinky.jpg", (336, 384), isPlayer)
+            Entity.__init__(self, "images/blinky.jpg", (396, 396))
         elif ghostType == 1:
-            Entity.__init__(self, "images/inky.jpg", (336, 360), isPlayer)
+            Entity.__init__(self, "images/inky.jpg", (396, 348))
         elif ghostType == 2:
-            Entity.__init__(self, "images/pinky.jpg", (312, 384), isPlayer)
+            Entity.__init__(self, "images/pinky.jpg", (324, 396))
         elif ghostType == 3:
-            Entity.__init__(self, "images/clyde.jpg", (312, 360), isPlayer)
+            Entity.__init__(self, "images/clyde.jpg", (324, 348))
         self._isScared = False
         self._isDead = False
         self._chaseMode = 1  # 0 is scatter state, 1 is chase state
@@ -276,47 +333,41 @@ class Ghost(Entity):
     def reset(self):  # resets the ghost
         self._position = pygame.Vector2(self._startPos)
         self._speed = 1
-        self._manUp = 9999999999
+        self._normalTick = 9999999999
         self._isScared = False
         self._isDead = False
         self._chaseMode = 1
+        self._img = pygame.transform.scale(pygame.image.load(self._imgJPG), (24, 24))
 
     def scareGhost(self):
-        self._manUp = pygame.time.get_ticks() + 5000
+        self._normalTick = pygame.time.get_ticks() + 5000
         self._isScared = True
         self._img = pygame.transform.scale(pygame.image.load("images/scared.jpg"), (24, 24))
         self._speed = 0.5
-        if self._direction != 0:
-            if self._direction // 2 == 0:
-                self._direction -= 1
-            elif self._direction // 2 == 1:
-                self._direction += 1
-        self._direction = 4
 
-    def runAway(self, targetVector):
-        displacementVector = targetVector - self.getPosition()
-        if displacementVector.x ** 2 < displacementVector.y ** 2:
-            if displacementVector.x < 0:
-                self._direction = 4
-            else:
-                self._direction = 3
-        else:
-            if displacementVector.y < 0:
-                self._direction = 2
-            else:
-                self._direction = 1
+    def runAway(self, vector):
+        targetVector = self.getPosition() - vector   # When running away, this is the vector the ghosts target.
+        return getDirectionPreference(targetVector)  # It is the vector opposite the vector facing pac-man
 
     def killGhost(self):
+        self._position = pygame.Vector2(self._startPos)
         self._isDead = True
         self._isScared = False
+        self._img = pygame.transform.scale(pygame.image.load("images/dead.jpg"), (24, 24))
+        self._normalTick = pygame.time.get_ticks() + 5000
+        self._direction = 0
 
-    def update(self, dt):
-        super().update(dt)
-        if pygame.time.get_ticks() >= self._manUp:
+    def updateState(self, dt):
+        if pygame.time.get_ticks() >= self._normalTick:
             self._isScared = False
+            self._isDead = False
             self._img = pygame.transform.scale(pygame.image.load(self._imgJPG), (24, 24))
             self._speed = 1
-            self._manUp = 9999999999
+            self._normalTick = 9999999999
+
+    def render(self, screen, dt):
+        super().render(screen, dt)
+        self.updateState(dt)
 
     def isScared(self):
         return self._isScared
@@ -326,28 +377,19 @@ class Ghost(Entity):
 
 
 class Blinky(Ghost):
-    def __init__(self, isPlayer):
-        Ghost.__init__(self, 0, isPlayer)
+    def __init__(self):
+        Ghost.__init__(self, 0)
 
-    def chasePlayer(self, playerPos):
-        displacementVector = list(playerPos - self.getPosition())
-        if displacementVector[0] ** 2 > displacementVector[1] ** 2:
-            if displacementVector[0] < 0:
-                self._direction = 3
-            else:
-                self._direction = 4
-        else:
-            if displacementVector[1] < 0:
-                self._direction = 1
-            else:
-                self._direction = 2
+    def getChaseDirections(self, playerPos):
+        displacementVector = pygame.Vector2(playerPos - self.getPosition())
+        return getDirectionPreference(displacementVector)
 
 
 class Inky(Ghost):
-    def __init__(self, isPlayer):
-        Ghost.__init__(self, 1, isPlayer)
+    def __init__(self):
+        Ghost.__init__(self, 1)
 
-    def chasePlayer(self, playerPos, playerDir, blinkyPos):
+    def getChaseDirections(self, playerPos, playerDir, blinkyPos):
         posArr = list(playerPos)
         if playerDir == 1:
             posArr[1] -= 2 * 24
@@ -365,14 +407,14 @@ class Inky(Ghost):
         targetVector = [0, 0]
         targetVector[0] = displacementVector[0] + posArr[0]
         targetVector[1] = displacementVector[1] + posArr[1]
-        self._direction = approachVector(pygame.Vector2(targetVector))
+        return getDirectionPreference(pygame.Vector2(targetVector))
 
 
 class Pinky(Ghost):
-    def __init__(self, isPlayer):
-        Ghost.__init__(self, 2, isPlayer)
+    def __init__(self):
+        Ghost.__init__(self, 2)
 
-    def chasePlayer(self, playerPos, playerDir):
+    def getChaseDirections(self, playerPos, playerDir):
         targetVector = list(playerPos)
         if playerDir == 1:
             targetVector[1] -= 4 * 24
@@ -383,16 +425,23 @@ class Pinky(Ghost):
         elif playerDir == 4:
             targetVector[0] += 4 * 24
         displacementVector = list(targetVector - self.getPosition())
-        if displacementVector[0] ** 2 > displacementVector[1] ** 2:
-            if displacementVector[0] < 0:
-                self._direction = 3
-            else:
-                self._direction = 4
+        return getDirectionPreference(pygame.Vector2(displacementVector))
+
+
+class Clyde(Ghost):
+    def __init__(self):
+        Ghost.__init__(self, 3)
+
+    def getChaseDirections(self, playerPos):
+        targetVector = list(playerPos)
+        displacementVector = (targetVector - self.getPosition())
+        if displacementVector[0] ** 2 + displacementVector[1] ** 2 < (
+                8 * 24) ** 2:  # only chase if magnitude less than 8 tiles
+            return getDirectionPreference(displacementVector)
         else:
-            if displacementVector[1] < 0:
-                self._direction = 1
-            else:
-                self._direction = 2
+            directionPreference = [1, 2, 3, 4]
+            random.shuffle(directionPreference)
+            return directionPreference
 
 
 class GhostGroup:
@@ -401,10 +450,17 @@ class GhostGroup:
         for entity in ghosts:
             self.__ghosts.append(entity)
 
-    def ghostCollision(self, boundBox, screen):
+    def normalGhostCollision(self, boundBox):
         for ghost in self.__ghosts:
             if boundBox.colliderect(ghost.getBoundBox()):
-                return True
+                if ghost.isScared():
+                    return True
+
+    def scaredGhostCollision(self, boundBox):
+        for ghost in self.__ghosts:
+            if boundBox.colliderect(ghost.getBoundBox()):
+                if not (ghost.isScared()):
+                    return True
 
     def resetGhosts(self):
         for ghost in self.__ghosts:
@@ -415,46 +471,33 @@ class GhostGroup:
             if not (ghost.isDead()):
                 ghost.scareGhost()
 
-class Referee(Board):
-
-    def isNextBlockWall(self, direction, gridPosition):
-        if direction == 1:
-            if self._board.getBoard()[gridPosition[1] - 1][gridPosition[0]] == 3:
+    def inScaredPhase(self):
+        for ghost in self.__ghosts:
+            if ghost.isScared():
                 return True
-            else:
-                return False
 
-        if direction == 2:
-            if self._board.getBoard()[gridPosition[1] + 1][gridPosition[0]] == 3:
-                return True
-            else:
-                return False
+    def getGhosts(self):
+        return self.__ghosts
 
-        if direction == 3:
-            if self._board.getBoard()[gridPosition[1]][gridPosition[0] - 1] == 3:
-                return True
-            else:
-                return False
-
-        try:
-            if direction == 4:
-                if self._board.getBoard()[gridPosition[1]][gridPosition[0] + 1] == 3:
-                    return True
-                else:
-                    return False
-        except IndexError:  # Error handling for the case where the player enters a right side warp; in this case there wouldn't be an incoming collision
-            return False
+    def render(self, screen, dt):
+        for ghost in self.__ghosts:
+            ghost.render(screen, dt)
 
 
+class Bots(GhostGroup):
+
+    def addBot(self, bot):
+        self.__ghosts.append(bot)
 
 
+class PlayerGhosts(GhostGroup):  # This class is useful for multiplayer
 
-
-
+    def removePlayer(self, player):
+        self.__ghosts.remove(player)
 
 
 ########################################################MAIN PROGRAM####################################################
-def main():
+def main(players):
     pygame.init()
     pygame.display.set_caption('PAC-MAN')
     print(u, d, l, r)
@@ -468,16 +511,40 @@ def main():
     fps = 240
     dt = 0
     level = 1
+    extraPlayers = players
     selectedBoard = boards.boardsdict["default"]
     board = Board(selectedBoard)
     pacman = Pacman()
-    blinky = Blinky(False)
-    inky = Inky(False)
-    pinky = Pinky(False)
-    clyde = Ghost(3, False)
+    blinky = Blinky()
+    inky = Inky()
+    pinky = Pinky()
+    clyde = Clyde()
     ghosts = GhostGroup(blinky, inky, pinky, clyde)
+
+    if extraPlayers == 1:
+        playerGhosts = PlayerGhosts(blinky)
+        botGhosts = Bots(inky, pinky, clyde)
+
+    elif extraPlayers == 2:
+        playerGhosts = PlayerGhosts(blinky, inky)
+        botGhosts = Bots(pinky, clyde)
+
+    elif extraPlayers == 3:
+        playerGhosts = PlayerGhosts(blinky, inky, pinky)
+        botGhosts = Bots(pinky, clyde)
+
+    elif extraPlayers == 4:
+        playerGhosts = PlayerGhosts(blinky, inky, pinky, clyde)
+        botGhosts = Bots()
+
+    else:
+        playerGhosts = PlayerGhosts()
+        botGhosts = Bots(blinky, inky, pinky, clyde)
+
     game = Game(3, level, board, ghosts, pacman)
-    referee = Referee(selectedBoard)
+
+    for bot in botGhosts.getGhosts():
+        print(bot)
 
     while running:
         for event in pygame.event.get():
@@ -487,7 +554,6 @@ def main():
         screen.fill("black")
 
         currentPos = pacman.getPosition()
-        gridPosition = getGridRef(currentPos[0], currentPos[1])
 
         newDirection = 0
         keys = pygame.key.get_pressed()
@@ -500,42 +566,45 @@ def main():
         elif keys[pygame.K_d]:
             newDirection = 4
 
-
-
-
         if keys[pygame.K_ESCAPE]:
             running = False
-        if board.getDotsLeft() == 0:
+        if board.getDotsLeft() == 0 or keys[pygame.K_j]:
             print("Level complete!")
-            game.restart()
-            pacman.restart()
-            ghosts.resetGhosts()
+            game.loadNextLevel()
 
         drawValue("Speed", pacman.getSpeed(), (400, 900), screen)
-        # if keys[pygame.K_t]:
-        # pacman.addSpeed(-0.01)
-        #  if keys[pygame.K_y]:
-        #       pacman.addSpeed(0.01)
-        #  if keys[pygame.K_p]:
-        #       print(pacman.getPosition())
+        if keys[pygame.K_t]:
+            pacman.addSpeed(-0.01)
+        if keys[pygame.K_y]:
+            pacman.addSpeed(0.01)
+        if keys[pygame.K_p]:
+            print(pacman.getPosition())
 
-        board.render(screen)
-        game.render(screen)
-        pacman.render(screen, dt)
-        kys = pacman.getDirection()
-        if inky.isScared():
-            blinky.runAway(currentPos)
-            inky.runAway(currentPos)
-            clyde.runAway(currentPos)
-            pinky.runAway(currentPos)
-        else:
-            blinky.chasePlayer(currentPos)
-            inky.chasePlayer(currentPos, kys, blinky.getPosition())
-            pinky.chasePlayer(currentPos, kys)
-        blinky.render(screen, dt)
-        inky.render(screen, dt)
-        pinky.render(screen, dt)
-        clyde.render(screen, dt)
+        pacmanDirection = pacman.getDirection()
+        for ghost in ghosts.getGhosts():
+            if ghost in playerGhosts.getGhosts():
+                pass  # do the player stuff
+            elif ghost in botGhosts.getGhosts() and board.coordInJunction(ghost.getPosition()[0],
+                                                                          ghost.getPosition()[1]) and not(ghost.isDead()):
+                if ghost.isScared():
+                    chaseDirections = ghost.runAway(currentPos)
+                else:
+                    try:
+                        chaseDirections = ghost.getChaseDirections(currentPos)
+                    except:
+                        try:
+                            chaseDirections = ghost.getChaseDirections(currentPos, pacmanDirection)
+                        except:
+                            chaseDirections = ghost.getChaseDirections(currentPos, pacmanDirection,
+                                                                       blinky.getPosition())
+                position = ghost.getPosition()
+                gridPosition = getGridRef(position[0], position[1])
+                for direction in chaseDirections:
+                    if not (board.isNextBlockWall(direction, gridPosition)):
+                        ghost.setDirection(direction)
+                        break
+
+        pacman.setDirection(newDirection)
 
         pacmanBox = pacman.getBoundBox()
         # if game.collidesWithWall(pacmanBox):
@@ -548,15 +617,18 @@ def main():
             game.addScore(50)
             ghosts.scareGhosts()
 
-        if ghosts.ghostCollision(pacmanBox, screen):
-            game.addLives(-1)
-            pacman.restart()
-            ghosts.resetGhosts()
+        for ghost in ghosts.getGhosts():
+            if pacmanBox.colliderect(ghost.getBoundBox()):
+                if ghost.isScared():
+                    ghost.killGhost()
+                elif not (ghost.isScared()):
+                    game.loseLevel()
 
         if game.getLives() == 0:
             print("Ran out of lives!")
             running = False
 
+        game.render(screen, dt)
         pygame.display.flip()
 
         clock.tick(fps)
@@ -576,4 +648,4 @@ def main():
 ########################################################################################################################
 
 if __name__ == "__main__":
-    main()
+    main(0)
