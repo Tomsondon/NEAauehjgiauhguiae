@@ -502,7 +502,7 @@ class Movement:
         self._blinky = blinky
 
     def moveCPU(self, ghost):
-        if not (ghost.isDead()) and self._board.coordInJunction(ghost.getPosition()[0],ghost.getPosition()[1]):
+        if not (ghost.isDead()) and self._board.coordInJunction(ghost.getPosition()[0], ghost.getPosition()[1]):
             if ghost.isScared():
                 chaseDirections = ghost.runAway(self._pacman.getPosition())
             else:
@@ -520,27 +520,39 @@ class Movement:
             gridPosition = getGridRef(position[0], position[1])
             for direction in chaseDirections:
                 if not (self._board.isNextBlockWall(direction, gridPosition)):
-                    ghost.setDirection(direction)
-                    break
+                    if math.ceil(ghost.getDirection() / 2) != math.ceil(
+                            direction / 2) or ghost.getDirection() == direction:  # prevents backwards movement
+                        ghost.setDirection(direction)
+                        break
 
-    def movePlayer(self, player, movementKeys):
-        keys = pygame.key.get_pressed()
+    def movePlayer(self, player, movementKeys, isLocal):
+        try:
+            isDead = player.isDead()
+        except:
+            isDead = False
+
         position = player.getPosition()
         gridPosition = getGridRef(position[0], position[1])
-        newDirection = 0
-        for key in movementKeys:
-            if keys[pygame.key.key_code(key)]:
-                newDirection = movementKeys.index(key) + 1
-                print(newDirection)
-                break
+        if isLocal:
+            keys = pygame.key.get_pressed()
+            newDirection = 0
+            for key in movementKeys:
+                if keys[pygame.key.key_code(key)]:
+                    newDirection = movementKeys.index(key) + 1
+                    break
+        else:
+            newDirection = movementKeys
         if player.getDirection() == 0 or math.ceil(newDirection / 2) == math.ceil(
-                player.getDirection() / 2) or self._board.coordInJunction(player.getPosition()[0], player.getPosition()[1]):  # 1-2 returns 1, 3-4 returns 2, 0 returns 0
+                player.getDirection() / 2) or self._board.coordInJunction(player.getPosition()[0],
+                                                                          player.getPosition()[
+                                                                              1]):  # 1-2 returns 1, 3-4 returns 2, 0 returns 0
             if not (self._board.isNextBlockWall(newDirection, gridPosition)):
                 if newDirection != 0:
                     player.setDirection(newDirection)
 
-        if self._board.coordInJunction(player.getPosition()[0], player.getPosition()[1]) and self._board.isNextBlockWall(
-                player.getDirection(), gridPosition):
+        if self._board.coordInJunction(player.getPosition()[0],
+                                       player.getPosition()[1]) and self._board.isNextBlockWall(
+            player.getDirection(), gridPosition):
             player.setDirection(0)
 
 
@@ -555,7 +567,7 @@ def main(players):
     screen = pygame.display.set_mode((720, 960))  # sets resolution to 3:4
     clock = pygame.time.Clock()
     running = True
-    fps = 240
+    FPS = 240
     dt = 0
     level = 1
     extraPlayers = players
@@ -568,13 +580,15 @@ def main(players):
     clyde = Clyde()
     ghosts = GhostGroup(blinky, inky, pinky, clyde)
     movement = Movement(board, pacman, blinky)
-    playerKeys = ["w", "s", "a", "d"]
-    player2Keys = ["i","k","j","l"]
-    #player2Keys.append(u)
-    #player2Keys.append(d)
-    #player2Keys.append(l)
-    #player2Keys.append(r)
-    #print(player2Keys)
+    PLAYERKEYS = ["w", "s", "a", "d"]
+    PLAYER2KEYS = ["i", "k", "j", "l"]
+    ghostsCombo = 0
+    LOCALGAME = True
+    # player2Keys.append(u)
+    # player2Keys.append(d)
+    # player2Keys.append(l)
+    # player2Keys.append(r)
+    # print(player2Keys)
 
     if extraPlayers == 1:
         playerGhosts = PlayerGhosts(blinky)
@@ -615,11 +629,11 @@ def main(players):
         drawValue("Speed", pacman.getSpeed(), (400, 900), screen)
         for ghost in ghosts.getGhosts():
             if ghost in playerGhosts.getGhosts():
-                movement.movePlayer(ghost, player2Keys)  # change this later
+                movement.movePlayer(ghost, PLAYER2KEYS, LOCALGAME)  # change this later
             elif ghost in botGhosts.getGhosts():
                 movement.moveCPU(ghost)
 
-        movement.movePlayer(pacman, playerKeys)
+        movement.movePlayer(pacman, PLAYERKEYS, LOCALGAME)
 
         pacmanBox = pacman.getBoundBox()
         pelletCheck = board.collidesWithPellet(pacmanBox)
@@ -633,6 +647,8 @@ def main(players):
             if pacmanBox.colliderect(ghost.getBoundBox()):
                 if ghost.isScared():
                     ghost.killGhost()
+                    ghostsCombo += 1
+                    game.addScore(100 * (2 ** ghostsCombo))
                 elif not (ghost.isScared()):
                     game.loseLevel()
 
@@ -640,11 +656,14 @@ def main(players):
             print("Ran out of lives!")
             running = False
 
+        if not ghosts.inScaredPhase() and ghostsCombo != 0:
+            ghostsCombo = 0
+
         game.render(screen, dt)
         pygame.display.flip()
 
-        clock.tick(fps)
-        dt = clock.tick(fps) / 1000
+        clock.tick(FPS)
+        dt = clock.tick(FPS) / 1000
 
     ###INPUT TO DATABASE###
 
