@@ -105,7 +105,6 @@ def replay(file):
             except:
                 messagebox.showinfo("Info", "End of Replay!")
                 return
-        # pygame.image.save(screen, "lmao/bruh.jpg")
         clock.tick(FPS)
         dt = clock.tick(FPS) / 1000
 
