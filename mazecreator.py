@@ -4,14 +4,14 @@ import pygame
 import boards
 from database import Leaderboard
 from game import Board, Square
-from structures import EventStack, Queue
+from structures import Stack, Queue
 
 
 class Creator(Board):
     def __init__(self, board):
         Board.__init__(self, board)
-        self.__UndoStack = EventStack(10)
-        self.__RedoStack = EventStack(10)
+        self.__UndoStack = Stack(10)
+        self.__RedoStack = Stack(10)
         self.__occupiedCells = [(14, 24), (16, 16), (16, 14), (13, 16), (13, 14)]
         self.__blankBoard = boards.boardsdict["blank"]
 
@@ -184,7 +184,7 @@ def main(username):
         keys = pygame.key.get_pressed()
         screen.fill("black")
         pygame.draw.rect(screen, "blue", saveButton)
-        pygame.draw.rect(screen,"blue", clearButton)
+        pygame.draw.rect(screen, "blue", clearButton)
         my_font = pygame.font.SysFont('Jokerman', 30)
         saveText = my_font.render("Save", False, "White")
         screen.blit(saveText, (610, 900))
@@ -228,11 +228,11 @@ def main(username):
             clearText = my_font.render("Clear Maze", False, (200, 200, 200))
             screen.blit(clearText, (310, 900))
 
-        if keys[pygame.K_z] and not (keyHeld):
+        if keys[pygame.K_z] and not keyHeld:
             customBoard.undo()
             keyHeld = True
 
-        if keys[pygame.K_r] and not (keyHeld):
+        if keys[pygame.K_r] and not keyHeld:
             customBoard.redo()
             keyHeld = True
 
