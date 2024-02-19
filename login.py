@@ -11,7 +11,8 @@ class AccountManager:
         self.__leaderboard = database.Leaderboard()
         self.__user = user
 
-    def displayWidgets(self, *widgets):
+    @staticmethod
+    def displayWidgets(*widgets):
         for widget in widgets:
             widget.grid()
 
