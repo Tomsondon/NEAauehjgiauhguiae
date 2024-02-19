@@ -1,23 +1,23 @@
 class Leaderboard:
     def __init__(self):
         import sqlite3
-        self.con = sqlite3.connect('leaderboard.db')
-        self.cur = self.con.cursor()
+        self.__con = sqlite3.connect('leaderboard.db')
+        self.__cur = self.__con.cursor()
         # Dates are stored in YYYY-MM-DD HH:MM:SS Format
-        self.cur.execute("""CREATE TABLE IF NOT EXISTS Users (
+        self.__cur.execute("""CREATE TABLE IF NOT EXISTS Users (
                     username TEXT PRIMARY KEY,
                     password TEXT,
                     salt TEXT,
                     creationDate INTEGER)
             """)
-        self.cur.execute("""CREATE TABLE IF NOT EXISTS Mazes (
+        self.__cur.execute("""CREATE TABLE IF NOT EXISTS Mazes (
                     mazeName TEXT PRIMARY KEY,
                     mazeString TEXT,
                     creator TEXT,
                     creationDate INTEGER,
                     FOREIGN KEY (creator) REFERENCES Users(username))
             """)
-        self.cur.execute("""CREATE TABLE IF NOT EXISTS Matches (
+        self.__cur.execute("""CREATE TABLE IF NOT EXISTS Matches (
                     matchID INTEGER PRIMARY KEY,
                     datePlayed INTEGER,
                     matchLength INTEGER,
@@ -25,7 +25,7 @@ class Leaderboard:
                     mazeName TEXT,
                     FOREIGN KEY (mazeName) REFERENCES Mazes(mazeName))
             """)
-        self.cur.execute("""CREATE TABLE IF NOT EXISTS MatchBook (
+        self.__cur.execute("""CREATE TABLE IF NOT EXISTS MatchBook (
                     matchBookID INTEGER PRIMARY KEY,
                     username TEXT,
                     matchID INTEGER,
@@ -33,7 +33,7 @@ class Leaderboard:
                     FOREIGN KEY (username) REFERENCES Users(username),
                     FOREIGN KEY (matchID) REFERENCES Matches(matchID))
             """)
-        self.cur.execute("""CREATE TABLE IF NOT EXISTS Replays (
+        self.__cur.execute("""CREATE TABLE IF NOT EXISTS Replays (
                     matchID INTEGER,
                     replayHash TEXT,
                     FOREIGN KEY (matchID) REFERENCES Matches(matchID))
@@ -41,11 +41,11 @@ class Leaderboard:
 
     def inputScore(self, datePlayed, matchLength, score, mazeName):
         matchparameters = [datePlayed, matchLength, score, mazeName]
-        self.cur.executemany("INSERT INTO Matches(datePlayed, matchLength, score, mazeName) VALUES (?,?,?,?)",
-                             [matchparameters])
+        self.__cur.executemany("INSERT INTO Matches(datePlayed, matchLength, score, mazeName) VALUES (?,?,?,?)",
+                               [matchparameters])
 
     def getAllMatchInfo(self):
-        matches = self.cur.execute("""SELECT
+        matches = self.__cur.execute("""SELECT
                             Matches.datePlayed,
                             Matches.matchLength,
                             Matches.score,
@@ -67,7 +67,7 @@ class Leaderboard:
         return matches.fetchall()
 
     def getAllUserInfo(self):
-        users = self.cur.execute("""SELECT
+        users = self.__cur.execute("""SELECT
                             Users.username,
                             Users.creationDate,
                             (SELECT COUNT(MatchBook.username)
@@ -97,24 +97,24 @@ class Leaderboard:
         return users.fetchall()
 
     def getMatchID(self):
-        matchID = int(str(self.cur.execute("SELECT last_insert_rowid()").fetchone()).strip("[(,)]"))
+        matchID = int(str(self.__cur.execute("SELECT last_insert_rowid()").fetchone()).strip("[(,)]"))
         return matchID
 
     def addToMatchBook(self, username, matchID, entityType):
         matchbookparameters = [username, matchID, entityType]
-        self.cur.executemany("INSERT INTO MatchBook(username, matchID, entityType) VALUES (?,?,?)",
-                             [matchbookparameters])
+        self.__cur.executemany("INSERT INTO MatchBook(username, matchID, entityType) VALUES (?,?,?)",
+                               [matchbookparameters])
 
     def addReplay(self, matchID, replayHash):
         replayparameters = [matchID, replayHash]
-        self.cur.executemany("INSERT INTO Replays VALUES (?,?)", [replayparameters])
+        self.__cur.executemany("INSERT INTO Replays VALUES (?,?)", [replayparameters])
 
     def getNumberOfGames(self, username):
-        games = self.cur.execute("SELECT username FROM Matches WHERE username = (?)", [username])
+        games = self.__cur.execute("SELECT username FROM Matches WHERE username = (?)", [username])
         return len(games.fetchall())
 
     def isUserExists(self, username):
-        users = self.cur.execute("SELECT username FROM Users WHERE username = (?)", [username])
+        users = self.__cur.execute("SELECT username FROM Users WHERE username = (?)", [username])
         if len(users.fetchall()) == 0:
             return False
         else:
@@ -129,26 +129,26 @@ class Leaderboard:
         dbPassword = salt + password
         h.update(dbPassword.encode())
         userparameters = [username, h.hexdigest(), salt, time.strftime("%Y-%m-%d %H:%M:%S")]
-        self.cur.executemany("INSERT INTO Users(username, password, salt, creationDate) VALUES (?,?,?,?)",
-                             [userparameters])
+        self.__cur.executemany("INSERT INTO Users(username, password, salt, creationDate) VALUES (?,?,?,?)",
+                               [userparameters])
 
     def storeMaze(self, mazeName, mazeString, creator, creationDate):
         mazeparameters = [mazeName, mazeString, creator, creationDate]
-        self.cur.executemany("INSERT INTO Mazes VALUES (?,?,?,?)", [mazeparameters])
+        self.__cur.executemany("INSERT INTO Mazes VALUES (?,?,?,?)", [mazeparameters])
 
     def getMazes(self):
-        mazes = self.cur.execute("SELECT mazeName, creator, mazeString FROM Mazes")
+        mazes = self.__cur.execute("SELECT mazeName, creator, mazeString FROM Mazes")
         return mazes.fetchall()
 
     def getMazeName(self, string):
-        query = self.cur.execute("SELECT mazeName FROM Mazes WHERE mazeString = (?)", [string])
+        query = self.__cur.execute("SELECT mazeName FROM Mazes WHERE mazeString = (?)", [string])
         name = query.fetchone()
         if name:
             return name[0]
         return ''
 
     def getReplayDetails(self, inputHash):
-        details = self.cur.execute("""SELECT Matches.datePlayed, 
+        details = self.__cur.execute("""SELECT Matches.datePlayed, 
                                 Matches.score,
                                 COUNT(MatchBook.matchID)
                                 FROM Matches 
@@ -166,9 +166,9 @@ class Leaderboard:
         if self.isUserExists(username):
             import hashlib
             h = hashlib.sha256()
-            salt = self.cur.execute("SELECT salt FROM Users WHERE username = (?)", [username])
+            salt = self.__cur.execute("SELECT salt FROM Users WHERE username = (?)", [username])
             h.update((salt.fetchone()[0] + password).encode())
-            correctPassword = self.cur.execute("SELECT password FROM Users WHERE username = (?)", [username])
+            correctPassword = self.__cur.execute("SELECT password FROM Users WHERE username = (?)", [username])
             correctPassword = correctPassword.fetchone()[0]
             if str(h.hexdigest()) == correctPassword:
                 return 0  # 0 indicates valid login
@@ -178,17 +178,16 @@ class Leaderboard:
             return 2  # 2 indicates non-existent user
 
     def deleteUser(self, username):
-        self.cur.execute("DELETE FROM Users WHERE username = (?)", [username])  # Remove user from database
-        self.cur.execute("""UPDATE MatchBook
+        self.__cur.execute("DELETE FROM Users WHERE username = (?)", [username])  # Remove user from database
+        self.__cur.execute("""UPDATE MatchBook
                             SET username = ""
                             WHERE username = (?)
-                    """, [username])                                            # Change all mentions of user to a null user
+                    """, [username])  # Change all mentions of user to a null user
 
     def deleteMatch(self, matchID):
-        self.cur.execute("DELETE FROM Matches WHERE matchID = (?)", [matchID])
-        self.cur.execute("DELETE FROM MatchBook WHERE matchID = (?)", [matchID])
-
+        self.__cur.execute("DELETE FROM Matches WHERE matchID = (?)", [matchID])
+        self.__cur.execute("DELETE FROM MatchBook WHERE matchID = (?)", [matchID])
 
     def close(self):
-        self.con.commit()
-        self.con.close()
+        self.__con.commit()
+        self.__con.close()
