@@ -14,38 +14,37 @@ def Square(x, y, size):
 
 class Board:
     def __init__(self, boardStr):
-        self.__boardStr = boardStr
-        self.__board = boards.decodeMaze(boardStr)
-        #self.__board = boards.decodeMaze("++++++++++M000000003M000000003M000000003M000000003M000000003M000000003M000000003M000000003M000000003M000000003M000000003M000000003M000000003M000000003M0000M0003M0000M0003M0000M0003M0000Y0003M0300c0003M0f00f0003M0c0030003M03M00M003M00+00c003M000M00003M000000003M000000003M000000003M000000003M000000003M000000003M000000003++++++++++")
+        self._boardStr = boardStr
+        self._board = boards.decodeMaze(boardStr) #creator inherits this
         self.__dotsLeft = 0
         self.__wallPositions = []
         self.__pelletPositions = []
         self.__ogPelletPositions = []
         self.__junctionPositions = []
 
-        for j in range(len(self.__board)):
-            for i in range(len(self.__board[j])):
+        for j in range(len(self._board)):
+            for i in range(len(self._board[j])):
                 pos = self.getCoord(i, j)
-                if self.__board[j][i] == 1:
+                if self._board[j][i] == 1:
                     self.__ogPelletPositions.append(Square(pos[0], pos[1], 6))
                     self.__pelletPositions.append(Square(pos[0], pos[1], 6))
                     self.__dotsLeft += 1
-                elif self.__board[j][i] == 2:
+                elif self._board[j][i] == 2:
                     self.__ogPelletPositions.append(Square(pos[0], pos[1], 12))
                     self.__pelletPositions.append(Square(pos[0], pos[1], 12))
                     self.__dotsLeft += 1
-                elif self.__board[j][i] == 3:
+                elif self._board[j][i] == 3:
                     self.__wallPositions.append(Square(pos[0], pos[1], 24))
 
-        for junctions in boards.mazeMapping(self.__board):
+        for junctions in boards.mazeMapping(self._board):
             pos = self.getCoord(junctions[1], junctions[0])
             self.__junctionPositions.append(Square(pos[0], pos[1], 2))
 
     def getBoard(self):
-        return self.__board
+        return self._board
 
     def getBoardStr(self):
-        return self.__boardStr
+        return self._boardStr
 
     def getJunctionPositions(self):
         return self.__junctionPositions
@@ -80,8 +79,6 @@ class Board:
             pygame.draw.rect(screen, "blue", i, 1)
         for i in self.__pelletPositions:
             pygame.draw.rect(screen, "white", i)
-        #for i in self.__junctionPositions:
-            #pygame.draw.rect(screen, "yellow", i, 3)
 
     def resetBoard(self):  # method is implemented like this rather than a simple assignment statement
         for pellet in self.__ogPelletPositions:  # to avoid the original list being permanently associated with the modified list
@@ -116,26 +113,26 @@ class Board:
 
         gridPosition = self.getGridRef(virtualPosition[0],virtualPosition[1])
         if direction == 1:
-            if self.__board[gridPosition[1] - 1][gridPosition[0]] == 3:
+            if self._board[gridPosition[1] - 1][gridPosition[0]] == 3:
                 return True
             else:
                 return False
 
         if direction == 2:
-            if self.__board[gridPosition[1] + 1][gridPosition[0]] == 3:
+            if self._board[gridPosition[1] + 1][gridPosition[0]] == 3:
                 return True
             else:
                 return False
 
         if direction == 3:
-            if self.__board[gridPosition[1]][gridPosition[0] - 1] == 3:
+            if self._board[gridPosition[1]][gridPosition[0] - 1] == 3:
                 return True
             else:
                 return False
 
         try:
             if direction == 4:
-                if self.__board[gridPosition[1]][gridPosition[0] + 1] == 3:
+                if self._board[gridPosition[1]][gridPosition[0] + 1] == 3:
                     return True
                 else:
                     return False
@@ -152,7 +149,7 @@ class Game:
         self.__score = 0
         self.__lives = lives
         self.__level = Level
-        self.__board = board
+        self._board = board
         self.__ghosts = ghosts
         self.__pacman = pacman
         self.__extraLifeAchieved = False
@@ -174,7 +171,7 @@ class Game:
 
     def loadNextLevel(self):
         self.__level += 1
-        self.__board.resetBoard()
+        self._board.resetBoard()
         print(math.log(self.__level, 55.90169944) + 0.6)
         self.__ghosts.setNormalSpeeds(math.log(self.__level, 55.90169944) + 0.6)
         print(math.log(self.__level, 55.90169944) + 0.6)
@@ -198,7 +195,7 @@ class Game:
     def render(self, screen, dt):
         screen.fill("black")
         self.__time = pygame.time.get_ticks() - self.__originalTime
-        self.__board.render(screen)
+        self._board.render(screen)
         self.__pacman.render(screen, dt)
         for ghost in self.__ghosts.getGhosts():
             ghost.render(screen, dt)
@@ -209,12 +206,12 @@ class Game:
         self.drawValue("Level", self.__level, (600, 900), screen)
 
     def checkIfLevelComplete(self):
-        if self.__board.getDotsLeft() == 0:
+        if self._board.getDotsLeft() == 0:
             print("Level complete!")
             return True
 
     def updateScore(self):
-        pelletCheck = self.__board.collidesWithPellet(self.__pacman.getBoundBox())
+        pelletCheck = self._board.collidesWithPellet(self.__pacman.getBoundBox())
         if pelletCheck == 1:
             self.addScore(10)
         elif pelletCheck == 2:
@@ -274,9 +271,7 @@ class Entity:
         self.updatePos(dt)
         self._boundBox = Square(self._position.x, self._position.y, 18)
         screen.blit(self._img, (self._position.x - 12, self._position.y - 12))
-        #pygame.draw.rect(screen, "red", self._boundBox, 1)
-        #pygame.draw.circle(screen, "green", self._position, 3)
-
+        
     def updatePos(self, dt):  # Direction 1 is up, 2 is down, 3 is left, 4 is right
         if self._direction == 1:
             self._position.y -= self._speed * 300 * dt
@@ -556,15 +551,15 @@ class PlayerGhosts(GhostGroup):  # This class is useful for multiplayer
 
 class Movement:
     def __init__(self, board, pacman, blinky):
-        self.__board = board
+        self._board = board
         self.__pacman = pacman
         self._blinky = blinky
 
     def moveCPU(self, ghost):
         if ghost.isDead():
             return
-        if ((self.__board.coordInJunction(ghost.getPosition()[0], ghost.getPosition()[1]) and Board.getGridRef(ghost.getPosition()[0], ghost.getPosition()[1]) != ghost.getLastJunction())
-                or (self.__board.isNextBlockWall(ghost.getDirection(),ghost.getPosition()))):
+        if ((self._board.coordInJunction(ghost.getPosition()[0], ghost.getPosition()[1]) and Board.getGridRef(ghost.getPosition()[0], ghost.getPosition()[1]) != ghost.getLastJunction())
+                or (self._board.isNextBlockWall(ghost.getDirection(),ghost.getPosition()))):
             if ghost.isScared():
                 chaseDirections = ghost.runAway(self.__pacman.getPosition())
             else:
@@ -581,7 +576,7 @@ class Movement:
             position = ghost.getPosition()
             gridPosition = Board.getGridRef(position[0], position[1])
             for direction in chaseDirections:
-                if not (self.__board.isNextBlockWall(direction, position)):
+                if not (self._board.isNextBlockWall(direction, ghost.getPosition())):
                     if math.ceil(ghost.getDirection() / 2) != math.ceil(
                             direction / 2) or ghost.getDirection() == direction:  # prevents backwards movement
                         ghost.setDirection(direction)
@@ -605,15 +600,15 @@ class Movement:
                     newDirection = movementKeys.index(key) + 1
                     break
             if player.getDirection() == 0 or math.ceil(newDirection / 2) == math.ceil(
-                    player.getDirection() / 2) or self.__board.coordInJunction(player.getPosition()[0],
+                    player.getDirection() / 2) or self._board.coordInJunction(player.getPosition()[0],
                                                                               player.getPosition()[
                                                                                   1]):  # 1-2 returns 1, 3-4 returns 2, 0 returns 0
-                if not (self.__board.isNextBlockWall(newDirection, position)):
+                if not (self._board.isNextBlockWall(newDirection, position)):
                     if newDirection != 0:
                         if newDirection != player.getDirection():
                             player.setDirection(newDirection)
 
-            if self.__board.isNextBlockWall(
+            if self._board.isNextBlockWall(
                 player.getDirection(), position):
                 player.setDirection(0)
 
@@ -635,15 +630,10 @@ def runGame(players, names, mazeString):
     with open ("config.ini","r") as configFile:
         configObj.read_file(configFile)
         print(configObj.sections())
-        #FPS = configObj.get("Performance","fps")
         configObj.sections()
 
     pygame.init()
-    # up = pygame.key.key_code(u)
-    # down = pygame.key.key_code(d)                                                          dont work for some reason
-    # left = pygame.key.key_code(l)
-    # right = pygame.key.key_code(r)
-    screen = pygame.display.set_mode((720, 960))  # sets resolution to 3:4
+    screen = pygame.display.set_mode((720, 960))  #sets resolution to 3:4
     clock = pygame.time.Clock()
     running = True
     TIMEOFGAME = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -706,7 +696,7 @@ def runGame(players, names, mazeString):
     game = Game(3, LEVEL, board, ghosts, pacman)
 
     if RECORDGAME:
-        fileName = time.time() #makes overlapping file names incredibly unlikely
+        fileName = time.time() #makes overlapping temp file names virtually impossible
         replayFile = open(f'replays/{fileName}',"w")
         replayFile.write(f'{FPS}\n')
         replayFile.write(f'{board.getBoardStr()}\n')
@@ -721,7 +711,7 @@ def runGame(players, names, mazeString):
 
 
 
-        ##MOVEMENT##
+        ###MOVEMENT###
         for ghost in ghosts.getGhosts():
             if ghost in playerGhosts.getGhosts():
                 movement.movePlayer(ghost, ghostKeyList[ghosts.getIndex(ghost)])
@@ -755,7 +745,6 @@ def runGame(players, names, mazeString):
         game.updateScore()
         game.render(screen, dt)
         pygame.display.flip()
-        #pygame.image.save(screen, "lmao/bruh.jpg")
         if RECORDGAME :
             replayFile.write(f'{pacman.getClass(), pacman.getPosition()} @{game.getTime()}\n')
             replayFile.write(f'{blinky.getClass(), blinky.getPosition()} @{game.getTime()}\n')
@@ -788,7 +777,7 @@ def runGame(players, names, mazeString):
         replayFile.close()
         import hashlib
         BUFFER = 32000
-        with open(f'replays/{fileName}',"rb") as binaryReplay: #approach inspired by https://stackoverflow.com/questions/22058048/hashing-a-file-in-python
+        with open(f'replays/{fileName}',"rb") as binaryReplay:
             h = hashlib.sha256()
             while True:
                 data = binaryReplay.read(BUFFER)
